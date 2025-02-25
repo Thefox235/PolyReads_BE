@@ -7,6 +7,7 @@ const orderModel = require('./order.model')
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const imagesModel = require('./images.model')
 module.exports = {insert, getAll, updateById,
      getNewPro, getCategory, getUsers, deleteById, 
      insertCategory, deleteCategoryById, getProByCata, 
@@ -15,12 +16,76 @@ module.exports = {insert, getAll, updateById,
      getSimilarProducts, register, login, getHotPro,
      getViewCount, changePassword, forgotPassword, 
      getAuthor, insertAuthor, deleteAuthorById, updateAuthorById,
-     checkEmailExists, getOrderByIdUser}
+     checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount
+    ,insertImages, getImages}
 
+
+//truy vấn images
+async function getImages(body){
+    try{
+        const result = 
+        await imagesModel.find()
+        return result;
+    }catch(error){
+        console.log('Lỗi khi getimages:', error);
+        throw error;
+    }
+}
+//thêm images
+async function insertImages(body){
+    try{
+        const {url, productId} = body;
+        const productFind = await productModel.findById(productId);
+        if (!productFind) {
+          throw new Error('Không tìm thấy images');
+        }
+        const newImages = new imagesModel({
+            url, 
+            productId
+        });
+        // Lưu vào collection categories
+        const result = await newImages.save();
+        return result;
+    }catch(error){
+        console.log('Lỗi khi thêm sản phẩm:', error);
+        throw error;
+    }
+}
 //tạo otp code
 function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }  
+
+//thêm discount
+async function insertDiscount(body){
+    try{
+        const {value, code,start_date,end_date,is_active} = body;
+        const newDiscount = new discountModel({
+            value, 
+            code,
+            start_date,
+            end_date,
+            is_active
+        });
+        // Lưu vào collection categories
+        const result = await newDiscount.save();
+        return result;
+    }catch(error){
+        console.log('Lỗi khi thêm discount:', error);
+        throw error;
+    }
+}
+//getAllDiscount
+async function getDiscount(body){
+    try{
+        const result = 
+        await discountModel.find()
+        return result;
+    }catch(error){
+        console.log('loi GetAllDiscount',error);
+        throw error;
+    }
+}
 
 //hàm lấy order từ idUser
 async function getOrderByIdUser(IdUser) {
@@ -436,7 +501,7 @@ async function insert(body) {
         format,
         published_date,
         publisher,
-        sale_cout,
+        sale_count,
         category,  // Đây là id của Category
         author,    // Đây là id của Author
         discount   // Đây là id của Discount
@@ -473,7 +538,7 @@ async function insert(body) {
         format,
         published_date,
         publisher,
-        sale_cout,
+        sale_count: 0,
         category,  // chỉ cần truyền id
         author,    // chỉ cần truyền id
         discount   // chỉ cần truyền id
@@ -490,11 +555,10 @@ async function insert(body) {
 
 async function insertCategory(body){
     try{
-        const {name, description, img} = body;
+        const {name, description} = body;
         const newCategory = new categoryModel({
             name,
-            description,
-            img
+            description
         });
         // Lưu vào collection categories
         const result = await newCategory.save();
@@ -504,6 +568,8 @@ async function insertCategory(body){
         throw error;
     }
 }
+
+
 
 async function getAll(body){
     try{

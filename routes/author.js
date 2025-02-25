@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 const authorController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
-const brandModel = require('../mongo/author.model.js');
+const authorModel = require('../mongo/author.model.js');
 
 router.get('/',async (req,res)=>{
     try {

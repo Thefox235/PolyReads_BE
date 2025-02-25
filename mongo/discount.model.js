@@ -3,7 +3,6 @@ const Schema = mongoose.Schema;
 const objectId = Schema.ObjectId;
  
 const discountSchema = new Schema({
-    _id: Schema.Types.ObjectId,
     value: { type: Number, required: true },
     code: { type: String, required: true },
     start_date:  {type: Date, required: true},

@@ -13,9 +13,9 @@ const productSchema = new Schema({
     pages: { type: Number, required: true },
     language: { type: String, required: true },
     format: { type: String, required: true },
-    published_date: { type: Date, required: true },
+    published_date: { type: String, required: true },
     publisher: { type: String, required: true },
-    sale_cout: { type: Number, required: true },
+    sale_count: { type: Number, required: true },
     category: { 
         type: Schema.Types.ObjectId, 
         ref: "category", 
@@ -29,7 +29,7 @@ const productSchema = new Schema({
     discount: { 
         type: Schema.Types.ObjectId, 
         ref: "discount", 
-        required: true 
+        default: null
     },
 });
 

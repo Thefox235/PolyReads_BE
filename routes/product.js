@@ -4,6 +4,19 @@ var router = express.Router();
 productController = require('../mongo/controller.model.js')
 const checktoken = require('../hepler/checktoken.js')
 /* GET users listing. */
+
+//lấy tất cả sản phẩm localhost:3000/product/
+router.get('/',async (req,res)=>{
+  try {
+    const products = 
+    await productController.getAll()
+    return res.status(200).json({products})
+  } catch (error) {
+    console.log('lỗi get all: ',error);
+    return res.status(500).json({mess: error})
+  }
+})
+//thêm sản phẩm localhost:3000/product/addpro
 router.post('/addpro', async (req, res)=> {
   try {
     const body = req.body;
@@ -16,39 +29,30 @@ router.post('/addpro', async (req, res)=> {
 });
 
 //lấy sản phẩm xem nhiều localhost:3000/product/viewCount
-router.get('/viewCount',async (req,res)=>{
-  try {
-    const products = 
-    await productController.getViewCount()
-    return res.status(200).json({products})
-  } catch (error) {
-    console.log('Lỗi get view count: ',error);
-    return res.status(500).json({mess: error})
-  }
-})
+// router.get('/viewCount',async (req,res)=>{
+//   try {
+//     const products = 
+//     await productController.getViewCount()
+//     return res.status(200).json({products})
+//   } catch (error) {
+//     console.log('Lỗi get view count: ',error);
+//     return res.status(500).json({mess: error})
+//   }
+// })
 
 //lấy sản phẩm hot localhost:3000/product/hot
-router.get('/hot',async (req,res)=>{
-  try {
-    const products = 
-    await productController.getHotPro()
-    return res.status(200).json({products})
-  } catch (error) {
-    console.log('Lỗi get hot: ',error);
-    return res.status(500).json({mess: error})
-  }
-})
+// router.get('/hot',async (req,res)=>{
+//   try {
+//     const products = 
+//     await productController.getHotPro()
+//     return res.status(200).json({products})
+//   } catch (error) {
+//     console.log('Lỗi get hot: ',error);
+//     return res.status(500).json({mess: error})
+//   }
+// })
 
-router.get('/',async (req,res)=>{
-  try {
-    const products = 
-    await productController.getAll()
-    return res.status(200).json({products})
-  } catch (error) {
-    console.log('lỗi get all: ',error);
-    return res.status(500).json({mess: error})
-  }
-})
+
 //lay san pham theo tien tang dan
 router.get('/limit',async (req,res)=>{
   try {
@@ -93,6 +97,7 @@ router.get('/:key/:value',async (req,res)=>{
     return res.status(500).json({mess: error});
   }
 })
+
 //update sản phẩm
 router.put('/:id',async (req,res)=>{
   try {
@@ -144,7 +149,7 @@ router.get('/new',async (req,res)=>{
   }
 })
 
-//http://localhost:3000/product/id
+//chi tiết sản phẩm http://localhost:3000/product/id
 router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -154,16 +159,14 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
     }
 
-    // Tăng viewCount lên 1
-    product.viewCount = (product.viewCount || 0) + 1;
-    await product.save();
-
     return res.status(200).json({productNew: product});
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message });
   }
 });
+
+//sản phẩm theo danh mục
 router.get('/cate/:id', async (req, res) => {
   try {
     const id = req.params.id;
