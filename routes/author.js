@@ -15,7 +15,7 @@ router.get('/',async (req,res)=>{
     }
   })
 
-// Thêm danh mục mới
+// Thêm tác giả mới
 router.post('/add', async (req, res) => {
   try {
       const body = req.body;

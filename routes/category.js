@@ -16,11 +16,11 @@ router.get('/',async (req,res)=>{
     }
   })
 
-  router.get('/similar/:catagoryId', async (req, res) => {
+  router.get('/similar/:categoryId', async (req, res) => {
     try {
-        const catagoryId = req.params.catagoryId;
+        const catagoryId = req.params.categoryId;
         console.log('cata: ',catagoryId);
-        const similarProducts = await productModel.find({'catagory.catagoryId': catagoryId});
+        const similarProducts = await productModel.find({'category': catagoryId});
         console.log('===>',similarProducts);
         return res.status(200).json({Products: similarProducts});
     } catch (error) {
