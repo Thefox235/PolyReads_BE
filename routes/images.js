@@ -14,6 +14,17 @@ router.get('/',async (req,res)=>{
     }
   })
 
+// lấy hình ảnh bằng id product localhost:3000/product/:productId
+router.get('/product/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const images = await imagesController.getImagesByProductId(id);
+    return res.status(200).json({ images });
+  } catch (error) {
+    console.error('Error retrieving images for product:', error);
+    return res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+});
 // Thêm hình ảnh mới
 router.post('/add', async (req, res) => {
   try {

@@ -1,6 +1,5 @@
 var express = require('express');
 const userModel = require('../mongo/user.model.js');
-const { register } = require('../mongo/controller.model.js');
 var router = express.Router();
 userController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
@@ -10,7 +9,7 @@ router.get('/',async (req,res)=>{
       const result = await userController.getUsers();
       return res.status(200).json({result})
     } catch (error) {
-      console.log('lỗi get all: ',error);
+      console.log('lỗi get all user: ',error);
       return res.status(500).json({mess: error})
     }
   })

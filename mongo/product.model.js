@@ -4,7 +4,7 @@ const objectId = Schema.ObjectId;
  
 const productSchema = new Schema({
     name: { type: String, required: true },
-    title: { type: String, required: true },
+    title: { type: String, required: false },
     description: { type: String, required: true },
     price: { type: Number, required: true },
     stock: { type: Number, required: true },
@@ -29,7 +29,7 @@ const productSchema = new Schema({
     discount: { 
         type: Schema.Types.ObjectId, 
         ref: "discount", 
-        default: null
+        required: false 
     },
 });
 

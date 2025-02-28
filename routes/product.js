@@ -27,6 +27,21 @@ router.post('/addpro', async (req, res)=> {
     res.status(500).json({mess: error})
   }
 });
+//thêm sản phẩm localhost:3000/product/add
+router.post('/add', async (req, res) => {
+  try {
+    // {
+    //    productData: { name: "...", price: ... },
+    //    images: [{url: "..."}, {url: "..."}]
+    // }
+    const { productData, images } = req.body;
+    const result = await productController.addNewProduct(productData, images);
+    return res.status(201).json({ productNew: result });
+  } catch (error) {
+    console.error('Lỗi insert product:', error);
+    return res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+});
 
 //lấy sản phẩm xem nhiều localhost:3000/product/viewCount
 // router.get('/viewCount',async (req,res)=>{
@@ -41,16 +56,16 @@ router.post('/addpro', async (req, res)=> {
 // })
 
 //lấy sản phẩm hot localhost:3000/product/hot
-// router.get('/hot',async (req,res)=>{
-//   try {
-//     const products = 
-//     await productController.getHotPro()
-//     return res.status(200).json({products})
-//   } catch (error) {
-//     console.log('Lỗi get hot: ',error);
-//     return res.status(500).json({mess: error})
-//   }
-// })
+router.get('/hot',async (req,res)=>{
+  try {
+    const products = 
+    await productController.getHotPro()
+    return res.status(200).json({products})
+  } catch (error) {
+    console.log('Lỗi get hot: ',error);
+    return res.status(500).json({mess: error})
+  }
+})
 
 
 //lay san pham theo tien tang dan
@@ -98,29 +113,34 @@ router.get('/:key/:value',async (req,res)=>{
   }
 })
 
-//update sản phẩm
-router.put('/:id',async (req,res)=>{
+// update sản phẩm (với cả cập nhật hình ảnh)
+router.put('/:id', async (req, res) => {
   try {
-    const {id} = req.params;
-    const body = req.body;
-    const pro = await productController.updateById(id,body)
-    return res.status(200).json({Products: pro})
+    const { id } = req.params;
+    // Destructure body nhận được: phải có key productData và images
+    const { productData, images } = req.body;
+    // Gọi hàm updateById truyền vào id, productData và images
+    const updatedProduct = await productController.updateById(id, productData, images);
+    return res.status(200).json({ product: updatedProduct });
   } catch (error) {
-    console.log('lỗi update: ',error);
-    return res.status(500).json({mess: error});
+    console.error('Lỗi update:', error);
+    return res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
-})
+});
 
 //xoa san pham theo id
-router.delete('/delete/:id',async (req,res)=>{
+router.delete('/delete/:id', async (req, res) => {
   try {
-    const {id} = req.params;
-    const prodel = await productController.deleteById(id)
+    const { id } = req.params;
+    const prodel = await productController.deleteById(id);
+    // Gửi về response khi xóa thành công:
+    return res.status(200).json(prodel);
   } catch (error) {
-    console.log('lỗi xóa sản phẩm:',error); 
-    return res.status(500).json({mess: error})
+    console.log('Lỗi xóa sản phẩm:', error);
+    return res.status(500).json({ mess: error.message || 'Internal Server Error' });
   }
-})
+});
+
 
 //xoa san pham theo điều kiện
 router.delete('/delete/:key/:value', async (req, res) => {

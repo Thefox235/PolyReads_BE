@@ -44,20 +44,20 @@ router.post('/add', async (req, res) => {
 router.delete('/delete/:id', async (req, res) => {
   try {
       const {id} = req.params;
-      await authorController.deleteBrandById(id);
-      return res.status(200).json({message: 'Brand đã được xóa thành công.'});
+      await authorController.deleteAuthorById(id);
+      return res.status(200).json({message: 'Author đã được xóa thành công.'});
   } catch (error) {
-      console.log('Lỗi xóa danh mục: ', error);
+      console.log('Lỗi xóa tác giả: ', error);
       return res.status(500).json({mess: error});
   }
 });
 
-
+//update tác giả
 router.put('/:id',async (req,res)=>{
   try {
     const {id} = req.params;
     const body = req.body;
-    const pro = await authorController.updateBrandById(id,body)
+    const pro = await authorController.updateAuthorById(id,body)
     return res.status(200).json({Products: pro})
   } catch (error) {
     console.log('lỗi update: ',error);
@@ -68,10 +68,10 @@ router.put('/:id',async (req,res)=>{
 router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const product = await brandModel.findById(id);
+    const product = await authorModel.findById(id);
     
     if (!product) {
-      return res.status(404).json({ message: 'Không tìm thấy Brand' });
+      return res.status(404).json({ message: 'Không tìm thấy Author' });
     }
     return res.status(210).json({productNew: product});
   } catch (err) {
@@ -79,4 +79,5 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
   module.exports = router;
