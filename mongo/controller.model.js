@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const imagesModel = require('./images.model')
-const sendMail = require('../hepler/sendmail')
+const {sendMail} = require('../hepler/sendmail')
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
@@ -19,8 +19,43 @@ module.exports = {
     getViewCount, changePassword, forgotPassword,
     getAuthor, insertAuthor, deleteAuthorById, updateAuthorById,
     checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount
-    , insertImages, getImages, addNewProduct, getImagesByProductId
+    , insertImages, getImages, addNewProduct, getImagesByProductId,
+    verifyOTP
 }
+
+//sát thức otp
+async function verifyOTP({ userId, otp }) {
+    try {
+        if (!userId || !otp) {
+          throw new Error("Thiếu thông tin userId hoặc OTP");
+        }
+    
+        const user = await userModel.findById(userId);
+        if (!user) {
+          throw new Error("Không tìm thấy user");
+        }
+    
+        if (user.otp_code !== otp) {
+          return { verified: false, message: "OTP không chính xác" };
+        }
+    
+        // Nếu OTP khớp, sử dụng updateOne với $unset để xóa trường otp_code
+        await userModel.updateOne(
+          { _id: userId },
+          { 
+            $set: { is_verified: true },
+            $unset: { otp_code: "" }  // Xóa trường otp_code
+          }
+        );
+    
+        // Lấy lại user đã được cập nhật
+        const updatedUser = await userModel.findById(userId);
+        return { verified: true, user: updatedUser };
+      } catch (error) {
+        console.error("Lỗi xác thực OTP:", error);
+        throw error;
+      }
+  };
 //get hình ảnh bằng id product
 async function getImagesByProductId(id) {
         try {
@@ -450,17 +485,10 @@ async function login(body) {
 
 async function register(body) {
     try {
-        const {
-            email,
-            pass,
-            name,
-            phone,
-            url_image,
-            role
-        } = body;
+        const { email, pass, name, phone, url_image, role } = body;
 
         // Kiểm tra email đã tồn tại chưa
-        let user = await userModel.findOne({ email: email });
+        let user = await userModel.findOne({ email });
         if (user) {
             throw new Error("Email đã tồn tại");
         }
@@ -469,10 +497,10 @@ async function register(body) {
         const salt = bcrypt.genSaltSync(10);
         const hash = bcrypt.hashSync(pass, salt);
 
-        // Tạo OTP và đặt is_verified là false
+        // Tạo OTP
         const otp = generateOTP();
 
-        // Tạo user mới – không cần truyền trường `date` vì đã có default
+        // Tạo user mới
         user = new userModel({
             _id: new mongoose.Types.ObjectId(),
             email,
@@ -481,15 +509,21 @@ async function register(body) {
             phone,
             otp_code: otp,          // Lưu OTP vừa tạo vào database
             is_verified: false,     // Chưa xác thực
-            url_image,
+            url_image: "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
             role: role || "0"       // Nếu role không được đăng ký, thiết lập mặc định
         });
-
         // Lưu user vào database
         const result = await user.save();
 
-        // Sau khi lưu, bạn có thể gửi OTP đến người dùng qua email/SMS ở đây.
-        // Ví dụ: sendOtpToUser(email, otp);
+        // Gửi email xác thực "fire-and-forget" không đợi kết quả gửi mail
+        sendMail({
+            email,
+            subject: 'Xác thực tài khoản',
+            html: `<p>Vui lòng nhập mã OTP: ${otp} để xác thực tài khoản của bạn.</p>`
+        }).catch(error => {
+            // Log lỗi gửi mail, hoặc xử lý theo cách bạn muốn nhưng không làm gián đoạn flow
+            console.error("Lỗi khi gửi email:", error);
+        });
 
         return result;
     } catch (error) {
@@ -497,6 +531,7 @@ async function register(body) {
         throw error;
     }
 }
+
 
 async function getSimilarProducts(categoryId) {
     try {

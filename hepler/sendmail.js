@@ -1,14 +1,13 @@
+// sendmail.js
 require('dotenv').config();
 const nodemailer = require('nodemailer');
-const { transporter } = require('../mongo/maile');
 
-
-const sendMail = async (email, subject, text) => {
+const sendMail = async ({ email, subject, text, html }) => {
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
-      secure: false,
+      secure: false, // dùng TLS (port 587)
       auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_PASS
@@ -19,17 +18,16 @@ const sendMail = async (email, subject, text) => {
       from: process.env.GMAIL_USER,
       to: email,
       subject: subject,
-      text: text
+      ...(html ? { html } : { text })
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully');
+    const result = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', result.messageId);
+    return result;
   } catch (error) {
     console.error('Error sending email:', error);
+    throw error;
   }
+};
 
-  const result = await transporter.sendMail(mailOptions);
-  return result;
-}
-
-module.exports = { sendMail };
+module.exports = { sendMail }; // Export dạng named export

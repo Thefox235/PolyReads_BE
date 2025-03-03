@@ -13,7 +13,19 @@ router.get('/',async (req,res)=>{
       return res.status(500).json({mess: error})
     }
   })
-
+//router để sát thực otp
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+    const result = await userController.verifyOTP({ userId, otp });
+    if (!result.verified) {
+      return res.status(400).json({ mess: result.message });
+    }
+    return res.json({ verified: true, user: result.user });
+  } catch (error) {
+    return res.status(500).json({ mess: error.message });
+  }
+});
  // Router để đổi mật khẩu
 router.post('/changepass',checktoken, async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
