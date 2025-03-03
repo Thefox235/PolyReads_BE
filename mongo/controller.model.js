@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const imagesModel = require('./images.model')
+const sendMail = require('../hepler/sendmail')
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
