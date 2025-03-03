@@ -53,7 +53,7 @@ app.use(cors())//cho phép gọi tới api này
 // ket noi database mongodb
 mongoose.connect('mongodb+srv://thanhduyhf2:kirixasu16.5@cluster0.k13gf.mongodb.net/PolyReads?retryWrites=true&w=majority&appName=Cluster0')
 .then(()=>console.log('kết nối thành công '))
-.catch((err)=>console.log('Thất bại',error))
+.catch((err)=>console.log('Thất bại',err))
 // định nghĩ routing
 
 app.use ('/',indexRouter);
