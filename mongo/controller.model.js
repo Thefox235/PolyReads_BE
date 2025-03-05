@@ -4,11 +4,12 @@ const authorModel = require('./author.model')
 const discountModel = require('./discount.model')
 const userModel = require('./user.model')
 const orderModel = require('./order.model')
+const bannerModel = require('./banner.model');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const imagesModel = require('./images.model')
-const {sendMail} = require('../hepler/sendmail')
+const { sendMail } = require('../hepler/sendmail')
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
@@ -18,124 +19,205 @@ module.exports = {
     getSimilarProducts, register, login, getHotPro,
     getViewCount, changePassword, forgotPassword,
     getAuthor, insertAuthor, deleteAuthorById, updateAuthorById,
-    checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount
-    , insertImages, getImages, addNewProduct, getImagesByProductId,
-    verifyOTP
+    checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount,
+    insertImages, getImages, addNewProduct, getImagesByProductId,
+    verifyOTP, getBanners, getBannerById, createBanner, updateBanner,
+    deleteBanner
+}
+
+// Lấy danh sách banner
+async function getBanners(req, res) {
+    try {
+        const banners = await bannerModel.find()
+        return banners;
+    } catch (error) {
+        console.error("Có lỗi khi lấy danh sách banner:", error);
+        return res.status(500).json({ message: "Có lỗi khi lấy danh sách banner", error });
+    }
+}
+
+// Lấy banner theo id
+async function getBannerById(req, res) {
+    const { id } = req.params;
+    try {
+        const banner = await bannerModel.findById(id);
+        if (!banner) {
+            return res.status(404).json({ message: "Banner không tồn tại" });
+        }
+        return res.json(banner);
+    } catch (error) {
+        console.error("Có lỗi khi lấy banner theo id:", error);
+        return res.status(500).json({ message: "Có lỗi khi lấy banner", error });
+    }
+}
+
+// Tạo banner mới
+async function createBanner(body) {
+    try {
+        const { image_url, title, position, is_active } = body;
+        const newBanner = new bannerModel({
+            _id: new mongoose.Types.ObjectId(),
+            image_url,
+            title,
+            position,
+            is_active: true
+        });
+        const result = await newBanner.save();
+        return (result);
+    } catch (error) {
+        console.error("Có lỗi khi tạo banner:", error);
+        return res.status(500).json({ message: "Có lỗi khi tạo banner", error });
+    }
+}
+
+// Cập nhật banner
+async function updateBanner(id, body) {
+    try {
+        const banner = await bannerModel.findById(id);
+        if (!banner) {
+            throw new Error('Không tìm thấy danh mục');
+        }
+        const { image_url, title, position, is_active } = body;
+        const result = await userModel.findByIdAndUpdate(
+            id,
+            { image_url, title, position, is_active },
+            { new: true }
+        );
+        return result;
+    } catch (error) {
+        console.error("Có lỗi khi cập nhật banner:", error);
+        return res.status(500).json({ message: "Có lỗi khi cập nhật banner", error });
+    }
+}
+
+// Xóa banner
+async function deleteBanner(req, res) {
+    const { id } = req.params;
+    try {
+        const deletedBanner = await bannerModel.findByIdAndDelete(id);
+        if (!deletedBanner) {
+            return res.status(404).json({ message: "Banner không tồn tại" });
+        }
+        return res.json({ message: "Banner đã được xóa thành công" });
+    } catch (error) {
+        console.error("Có lỗi khi xóa banner:", error);
+        return res.status(500).json({ message: "Có lỗi khi xóa banner", error });
+    }
 }
 
 //sát thức otp
 async function verifyOTP({ userId, otp }) {
     try {
         if (!userId || !otp) {
-          throw new Error("Thiếu thông tin userId hoặc OTP");
+            throw new Error("Thiếu thông tin userId hoặc OTP");
         }
-    
+
         const user = await userModel.findById(userId);
         if (!user) {
-          throw new Error("Không tìm thấy user");
+            throw new Error("Không tìm thấy user");
         }
-    
+
         if (user.otp_code !== otp) {
-          return { verified: false, message: "OTP không chính xác" };
+            return { verified: false, message: "OTP không chính xác" };
         }
-    
+
         // Nếu OTP khớp, sử dụng updateOne với $unset để xóa trường otp_code
         await userModel.updateOne(
-          { _id: userId },
-          { 
-            $set: { is_verified: true },
-            $unset: { otp_code: "" }  // Xóa trường otp_code
-          }
+            { _id: userId },
+            {
+                $set: { is_verified: true },
+                $unset: { otp_code: "" }  // Xóa trường otp_code
+            }
         );
-    
+
         // Lấy lại user đã được cập nhật
         const updatedUser = await userModel.findById(userId);
         return { verified: true, user: updatedUser };
-      } catch (error) {
+    } catch (error) {
         console.error("Lỗi xác thực OTP:", error);
         throw error;
-      }
-  };
+    }
+};
 //get hình ảnh bằng id product
 async function getImagesByProductId(id) {
-        try {
-          // Tìm các ảnh có productId khớp với tham số được truyền vào
-          const images = await imagesModel.find({ 'productId': id });
-          return images;
-        } catch (error) {
-          console.error("Có lỗi khi lấy hình ảnh cho sản phẩm:", error);
-          throw error;
-        }      
+    try {
+        // Tìm các ảnh có productId khớp với tham số được truyền vào
+        const images = await imagesModel.find({ 'productId': id });
+        return images;
+    } catch (error) {
+        console.error("Có lỗi khi lấy hình ảnh cho sản phẩm:", error);
+        throw error;
+    }
 }
 async function updateById(productId, productData, images) {
     // Khởi tạo session
     const session = await mongoose.startSession();
     session.startTransaction();
-  
+
     try {
-      // Tìm sản phẩm theo productId và sử dụng session
-      const product = await productModel.findById(productId).session(session);
-      if (!product) {
-        throw new Error('Không tìm thấy sản phẩm');
-      }
-  
-      // Nếu có cập nhật cho category, kiểm tra sự tồn tại của category đó
-      if (productData.category) {
-        const categoryFind = await categoryModel.findById(productData.category).session(session);
-        if (!categoryFind) {
-          throw new Error('Không tìm thấy category');
+        // Tìm sản phẩm theo productId và sử dụng session
+        const product = await productModel.findById(productId).session(session);
+        if (!product) {
+            throw new Error('Không tìm thấy sản phẩm');
         }
-      }
-  
-      // Nếu có cập nhật cho author, kiểm tra sự tồn tại của author
-      if (productData.author) {
-        const authorFind = await authorModel.findById(productData.author).session(session);
-        if (!authorFind) {
-          throw new Error('Không tìm thấy author');
+
+        // Nếu có cập nhật cho category, kiểm tra sự tồn tại của category đó
+        if (productData.category) {
+            const categoryFind = await categoryModel.findById(productData.category).session(session);
+            if (!categoryFind) {
+                throw new Error('Không tìm thấy category');
+            }
         }
-      }
-  
-      // Nếu có cập nhật cho discount, kiểm tra sự tồn tại của discount
-      if (productData.discount) {
-        const discountFind = await discountModel.findById(productData.discount).session(session);
-        if (!discountFind) {
-          throw new Error('Không tìm thấy discount');
+
+        // Nếu có cập nhật cho author, kiểm tra sự tồn tại của author
+        if (productData.author) {
+            const authorFind = await authorModel.findById(productData.author).session(session);
+            if (!authorFind) {
+                throw new Error('Không tìm thấy author');
+            }
         }
-      }
-  
-      // Cập nhật sản phẩm với các trường mới (chỉ cập nhật nếu có dữ liệu mới)
-      const updatedProduct = await productModel.findByIdAndUpdate(
-        productId,
-        productData,
-        { new: true, session }
-      );
-  
-      // Xử lý cập nhật ảnh:
-      // Ta thực hiện xóa hết các ảnh cũ liên quan đến sản phẩm này
-      await imagesModel.deleteMany({ productId }, { session });
-  
-      // Nếu có hình ảnh mới được truyền vào (mảng images không rỗng)
-      if (images && images.length > 0) {
-        const newImagesData = images.map(image => ({
-          productId,
-          url: image.url,
-          // Thêm các trường khác nếu cần.
-        }));
-        // Chèn các ảnh mới vào collection cùng với session.
-        await imagesModel.insertMany(newImagesData, { session });
-      }
-  
-      // Commit transaction nếu mọi thứ đều thành công
-      await session.commitTransaction();
-      session.endSession();
-  
-      return updatedProduct;
+
+        // Nếu có cập nhật cho discount, kiểm tra sự tồn tại của discount
+        if (productData.discount) {
+            const discountFind = await discountModel.findById(productData.discount).session(session);
+            if (!discountFind) {
+                throw new Error('Không tìm thấy discount');
+            }
+        }
+
+        // Cập nhật sản phẩm với các trường mới (chỉ cập nhật nếu có dữ liệu mới)
+        const updatedProduct = await productModel.findByIdAndUpdate(
+            productId,
+            productData,
+            { new: true, session }
+        );
+
+        // Xử lý cập nhật ảnh:
+        // Ta thực hiện xóa hết các ảnh cũ liên quan đến sản phẩm này
+        await imagesModel.deleteMany({ productId }, { session });
+
+        // Nếu có hình ảnh mới được truyền vào (mảng images không rỗng)
+        if (images && images.length > 0) {
+            const newImagesData = images.map(image => ({
+                productId,
+                url: image.url,
+                // Thêm các trường khác nếu cần.
+            }));
+            // Chèn các ảnh mới vào collection cùng với session.
+            await imagesModel.insertMany(newImagesData, { session });
+        }
+
+        // Commit transaction nếu mọi thứ đều thành công
+        await session.commitTransaction();
+        session.endSession();
+
+        return updatedProduct;
     } catch (error) {
-      // Nếu gặp lỗi, rollback transaction và ném lỗi ra
-      await session.abortTransaction();
-      session.endSession();
-      console.error('Error in transaction update:', error);
-      throw error;
+        // Nếu gặp lỗi, rollback transaction và ném lỗi ra
+        await session.abortTransaction();
+        session.endSession();
+        console.error('Error in transaction update:', error);
+        throw error;
     }
 }
 //thêm sản phẩm và hình ảnh
@@ -143,88 +225,88 @@ async function addNewProduct(productData, images) {
     // Tạo một session mới
     const session = await mongoose.startSession();
     session.startTransaction();
-  
-    try {
-      // Bước 1: Tạo sản phẩm mới trong collection Product.
-      const {
-        name,
-        title,
-        description,
-        price,
-        stock,
-        weight,
-        size,
-        pages,
-        language,
-        format,
-        published_date,
-        publisher,
-        sale_count,
-        category,  // Đây là id của Category
-        author,    // Đây là id của Author
-        discount   // Đây là id của Discount
-    } = productData;
-     // Kiểm tra xem Category có tồn tại không
-     const categoryFind = await categoryModel.findById(category);
-     if (!categoryFind) {
-         throw new Error('Không tìm thấy category', categoryFind);
-     }
 
-     // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
-     const authorFind = await authorModel.findById(author);
-     if (!authorFind) {
-         throw new Error('Không tìm thấy author');
-     }
-     const proNew = new productModel({
-        name,
-        title,
-        description,
-        price,
-        stock,
-        weight,
-        size,
-        pages,
-        language,
-        format,
-        published_date,
-        publisher,
-        sale_count: 0,
-        category,  // chỉ cần truyền id
-        author,    // chỉ cần truyền id
-        discount   // chỉ cần truyền id
-    });
-      // Nếu hàm insert của bạn hỗ trợ truyền session, hãy dùng:
-      const newProduct = await proNew.save();
-      console.log(newProduct);
-      // Nếu không, và insert tự xử lý lưu mà không cần session, giữ nguyên:
-      // const newProduct = await insert([productData]);
-      const productId = newProduct._id; // Lấy _id của sản phẩm mới tạo
-  
-      // Bước 2: Xử lý dữ liệu cho ảnh dựa trên productId vừa tạo
-      const imageData = images.map(image => ({
-        productId: productId,
-        url: image.url,
-        // Thêm các trường khác nếu cần
-      }));
-  
-      // Thêm ảnh vào collection ProductImage cùng với session
-      await imagesModel.insertMany(imageData, { session });
-  
-      // Nếu mọi thao tác đều thành công, commit transaction
-      await session.commitTransaction();
-      session.endSession();
-  
-      return newProduct;
-    } 
-    catch (error) {
-      // Nếu có lỗi, rollback transaction
-      await session.abortTransaction();
-      session.endSession();
-      console.error("Error in transaction:", error);
-      throw error;
+    try {
+        // Bước 1: Tạo sản phẩm mới trong collection Product.
+        const {
+            name,
+            title,
+            description,
+            price,
+            stock,
+            weight,
+            size,
+            pages,
+            language,
+            format,
+            published_date,
+            publisher,
+            sale_count,
+            category,  // Đây là id của Category
+            author,    // Đây là id của Author
+            discount   // Đây là id của Discount
+        } = productData;
+        // Kiểm tra xem Category có tồn tại không
+        const categoryFind = await categoryModel.findById(category);
+        if (!categoryFind) {
+            throw new Error('Không tìm thấy category', categoryFind);
+        }
+
+        // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
+        const authorFind = await authorModel.findById(author);
+        if (!authorFind) {
+            throw new Error('Không tìm thấy author');
+        }
+        const proNew = new productModel({
+            name,
+            title,
+            description,
+            price,
+            stock,
+            weight,
+            size,
+            pages,
+            language,
+            format,
+            published_date,
+            publisher,
+            sale_count: 0,
+            category,  // chỉ cần truyền id
+            author,    // chỉ cần truyền id
+            discount   // chỉ cần truyền id
+        });
+        // Nếu hàm insert của bạn hỗ trợ truyền session, hãy dùng:
+        const newProduct = await proNew.save();
+        console.log(newProduct);
+        // Nếu không, và insert tự xử lý lưu mà không cần session, giữ nguyên:
+        // const newProduct = await insert([productData]);
+        const productId = newProduct._id; // Lấy _id của sản phẩm mới tạo
+
+        // Bước 2: Xử lý dữ liệu cho ảnh dựa trên productId vừa tạo
+        const imageData = images.map(image => ({
+            productId: productId,
+            url: image.url,
+            // Thêm các trường khác nếu cần
+        }));
+
+        // Thêm ảnh vào collection ProductImage cùng với session
+        await imagesModel.insertMany(imageData, { session });
+
+        // Nếu mọi thao tác đều thành công, commit transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        return newProduct;
     }
-  }
-  
+    catch (error) {
+        // Nếu có lỗi, rollback transaction
+        await session.abortTransaction();
+        session.endSession();
+        console.error("Error in transaction:", error);
+        throw error;
+    }
+}
+
 //truy vấn images
 async function getImages(body) {
     try {
@@ -332,25 +414,25 @@ async function updateAuthorById(id, body) {
 //hàm xoá author
 async function deleteAuthorById(id) {
     try {
-      // Kiểm tra xem có sản phẩm nào sử dụng tác giả này hay không
-      const count = await productModel.countDocuments({ author: id });
-      if (count > 0) {
-        throw new Error(`Không thể xóa tác giả vì có ${count} sản phẩm đang sử dụng`);
-      }
-  
-      // Nếu không có sản phẩm nào liên kết, tiến hành xóa
-      const result = await authorModel.findByIdAndDelete(id);
-      if (result) {
-        return { message: 'Author deleted successfully', data: result };
-      } else {
-        throw new Error('Author not found');
-      }
+        // Kiểm tra xem có sản phẩm nào sử dụng tác giả này hay không
+        const count = await productModel.countDocuments({ author: id });
+        if (count > 0) {
+            throw new Error(`Không thể xóa tác giả vì có ${count} sản phẩm đang sử dụng`);
+        }
+
+        // Nếu không có sản phẩm nào liên kết, tiến hành xóa
+        const result = await authorModel.findByIdAndDelete(id);
+        if (result) {
+            return { message: 'Author deleted successfully', data: result };
+        } else {
+            throw new Error('Author not found');
+        }
     } catch (error) {
-      console.error('Error deleting author:', error);
-      throw error;
+        console.error('Error deleting author:', error);
+        throw error;
     }
-  }
-  
+}
+
 //hàm lấy brand
 async function getAuthor() {
     try {
@@ -646,13 +728,13 @@ async function insertUser(body) {
 
 async function getProByCata(categoryId) {
     try {
-      const products = await productModel.find({ category: mongoose.Types.ObjectId(categoryId) });
-      return products;
+        const products = await productModel.find({ category: mongoose.Types.ObjectId(categoryId) });
+        return products;
     } catch (error) {
-      console.error('Lỗi lấy sản phẩm theo danh mục: ', error);
-      throw error;
+        console.error('Lỗi lấy sản phẩm theo danh mục: ', error);
+        throw error;
     }
-  }
+}
 
 async function getUsers() {
     try {
@@ -680,25 +762,25 @@ async function deleteById(id) {
 //xóa category
 async function deleteCategoryById(id) {
     try {
-      // Kiểm tra xem có sản phẩm nào sử dụng danh mục này hay không
-      const count = await productModel.countDocuments({ category: id });
-      if (count > 0) {
-        throw new Error(`Không thể xóa danh mục vì có ${count} sản phẩm đang sử dụng`);
-      }
-  
-      // Nếu không có sản phẩm nào liên kết, tiến hành xóa
-      const result = await categoryModel.findByIdAndDelete(id);
-      if (result) {
-        return { message: 'Category deleted successfully', data: result };
-      } else {
-        throw new Error('Category not found');
-      }
+        // Kiểm tra xem có sản phẩm nào sử dụng danh mục này hay không
+        const count = await productModel.countDocuments({ category: id });
+        if (count > 0) {
+            throw new Error(`Không thể xóa danh mục vì có ${count} sản phẩm đang sử dụng`);
+        }
+
+        // Nếu không có sản phẩm nào liên kết, tiến hành xóa
+        const result = await categoryModel.findByIdAndDelete(id);
+        if (result) {
+            return { message: 'Category deleted successfully', data: result };
+        } else {
+            throw new Error('Category not found');
+        }
     } catch (error) {
-      console.error('Error deleting category:', error);
-      throw error;
+        console.error('Error deleting category:', error);
+        throw error;
     }
-  }
-  
+}
+
 
 async function getCategory() {
     try {

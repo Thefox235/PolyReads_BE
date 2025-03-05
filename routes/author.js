@@ -27,19 +27,6 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// Cập nhật danh mục theo id
-// router.put('/:id', async (req, res) => {
-//   try {
-//       const {id} = req.params;
-//       const body = req.body;
-//       const updatedCategory = await categoryController.updateCategoryById(id, body);
-//       return res.status(200).json({updatedCategory});
-//   } catch (error) {
-//       console.log('Lỗi cập nhật danh mục: ', error);
-//       return res.status(500).json({mess: error});
-//   }
-// });
-
 // Xóa danh mục theo id
 router.delete('/delete/:id', async (req, res) => {
   try {
