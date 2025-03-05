@@ -21,7 +21,7 @@ module.exports = {
     getAuthor, insertAuthor, deleteAuthorById, updateAuthorById,
     checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount,
     insertImages, getImages, addNewProduct, getImagesByProductId,
-    verifyOTP, getBanners, getBannerById, createBanner, updateBanner,
+    verifyOTP, getBanners, createBanner, updateBanner,
     deleteBanner
 }
 
@@ -36,37 +36,24 @@ async function getBanners(req, res) {
     }
 }
 
-// Lấy banner theo id
-async function getBannerById(req, res) {
-    const { id } = req.params;
-    try {
-        const banner = await bannerModel.findById(id);
-        if (!banner) {
-            return res.status(404).json({ message: "Banner không tồn tại" });
-        }
-        return res.json(banner);
-    } catch (error) {
-        console.error("Có lỗi khi lấy banner theo id:", error);
-        return res.status(500).json({ message: "Có lỗi khi lấy banner", error });
-    }
-}
-
 // Tạo banner mới
-async function createBanner(body) {
+async function createBanner(body, res) { // Added 'res' as a parameter
     try {
         const { image_url, title, position, is_active } = body;
+        // Set is_active to true if it is not provided in the body
+        const isActive = is_active !== undefined ? is_active : true;
         const newBanner = new bannerModel({
             _id: new mongoose.Types.ObjectId(),
             image_url,
             title,
             position,
-            is_active: true
+            is_active: isActive
         });
         const result = await newBanner.save();
-        return (result);
+        return result;
     } catch (error) {
         console.error("Có lỗi khi tạo banner:", error);
-        return res.status(500).json({ message: "Có lỗi khi tạo banner", error });
+        return { message: "Có lỗi khi tạo banner", error }; // Return error message and details
     }
 }
 
@@ -75,33 +62,33 @@ async function updateBanner(id, body) {
     try {
         const banner = await bannerModel.findById(id);
         if (!banner) {
-            throw new Error('Không tìm thấy danh mục');
+            throw new Error('Không tìm thấy banner');
         }
         const { image_url, title, position, is_active } = body;
-        const result = await userModel.findByIdAndUpdate(
+        const result = await bannerModel.findByIdAndUpdate(
             id,
             { image_url, title, position, is_active },
             { new: true }
         );
         return result;
     } catch (error) {
-        console.error("Có lỗi khi cập nhật banner:", error);
-        return res.status(500).json({ message: "Có lỗi khi cập nhật banner", error });
+        console.log('Lỗi update theo id', error);
+        throw error;
     }
 }
 
 // Xóa banner
-async function deleteBanner(req, res) {
-    const { id } = req.params;
+async function deleteBanner(id) {
     try {
         const deletedBanner = await bannerModel.findByIdAndDelete(id);
-        if (!deletedBanner) {
-            return res.status(404).json({ message: "Banner không tồn tại" });
+        if (deletedBanner) {
+            return { message: 'banner xóa thành công', data: deletedBanner };
+        }else {
+            throw new Error('Product not found');
         }
-        return res.json({ message: "Banner đã được xóa thành công" });
     } catch (error) {
-        console.error("Có lỗi khi xóa banner:", error);
-        return res.status(500).json({ message: "Có lỗi khi xóa banner", error });
+        console.error('Error deleting product:', error);
+        throw error;
     }
 }
 
@@ -456,7 +443,7 @@ async function insertAuthor(body) {
         const result = await newbrand.save();
         return result;
     } catch (error) {
-        console.log('Lỗi khi thêm brand:', error);
+        console.log('Lỗi khi thêm tác giả:', error);
         throw error;
     }
 }
