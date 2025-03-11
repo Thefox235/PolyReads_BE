@@ -10,6 +10,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const imagesModel = require('./images.model')
 const { sendMail } = require('../hepler/sendmail')
+const publisherModel = require('./publisher.model')
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
@@ -22,9 +23,72 @@ module.exports = {
     checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount,
     insertImages, getImages, addNewProduct, getImagesByProductId,
     verifyOTP, getBanners, createBanner, updateBanner,
-    deleteBanner
+    deleteBanner, getPublisher, insertPublisher, deletePublisherById,
+    updatePublisherById
 }
 
+//hàm sửa nxb
+async function updatePublisherById(id, body) {
+    try {
+        const result = await publisherModel.findByIdAndUpdate(id, body, { new: true });
+        if (result) {
+            return { message: 'Sửa nxb thành công', data: result };
+        } else {
+            throw new Error('Ko tìm thấy nxb');
+        }
+    } catch (error) {
+        console.error('lỗi sửa nxb:', error);
+        throw error;
+    }
+}
+
+//hàm xoá nxb
+async function deletePublisherById(id) {
+    try {
+        // Kiểm tra xem có sản phẩm nào sử dụng tác giả này hay không
+        const count = await productModel.countDocuments({ publisher: id });
+        if (count > 0) {
+            throw new Error(`Không thể xóa tác giả vì có ${count} sản phẩm đang sử dụng`);
+        }
+
+        // Nếu không có sản phẩm nào liên kết, tiến hành xóa
+        const result = await publisherModel.findByIdAndDelete(id);
+        if (result) {
+            return { message: 'NXB Xóa thành công', data: result };
+        } else {
+            throw new Error('Nxb not found');
+        }
+    } catch (error) {
+        console.error('Error deleting nxb:', error);
+        throw error;
+    }
+}
+
+//hàm thêm nxb
+async function insertPublisher(body) {
+    try {
+        const { name, is_active } = body;
+        const newPublisher = new publisherModel({
+            name,
+            is_active: true
+        });
+        const result = await newPublisher.save();
+        return result;
+    } catch (error) {
+        console.log('Lỗi khi thêm nxb:', error);
+        throw error;
+    }
+}
+//hàm lấy danh sách publisher
+async function getPublisher() {
+    try {
+        const result = await publisherModel.find();
+        return result;
+    } catch (error) {
+        console.log('loi getPublisher', error);
+        throw error;
+    }
+}
 // Lấy danh sách banner
 async function getBanners(req, res) {
     try {
@@ -850,10 +914,11 @@ async function insert(body) {
 
 async function insertCategory(body) {
     try {
-        const { name, description } = body;
+        const { name, type, is_active } = body;
         const newCategory = new categoryModel({
             name,
-            description
+            type,
+            is_active
         });
         // Lưu vào collection categories
         const result = await newCategory.save();
@@ -914,10 +979,10 @@ async function updateCateById(id, body) {
         if (!pro) {
             throw new Error('Không tìm thấy danh mục');
         }
-        const { name, img, description } = body;
+        const { name, type, is_active } = body;
         const result = await categoryModel.findByIdAndUpdate(
             id,
-            { name, img, description },
+            { name, type, is_active },
             { new: true }
         );
         return result;

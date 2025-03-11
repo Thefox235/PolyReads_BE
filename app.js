@@ -19,6 +19,7 @@ require('./mongo/discount.model');
 require('./mongo/banner.model');
 require('./mongo/order_detail.model');
 require('./mongo/comment.model');
+require('./mongo/publisher.model');
 
 
 var indexRouter = require('./routes/index');
@@ -36,6 +37,7 @@ var discountRouter = require('./routes/discount');
 var bannerRouter = require('./routes/banner');
 var order_detailRouter = require('./routes/order_detail');
 var commentRouter = require('./routes/comment');
+var publisherRouter = require('./routes/publisher');
 
 
 var app = express();
@@ -70,6 +72,7 @@ app.use ('/discount',discountRouter);
 app.use ('/banner',bannerRouter);
 app.use ('/order_detail',order_detailRouter);
 app.use ('/comment',commentRouter);
+app.use ('/publisher',publisherRouter);
 
 
 // app.use('/', indexRouter);

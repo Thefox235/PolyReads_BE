@@ -14,8 +14,12 @@ const productSchema = new Schema({
     language: { type: String, required: true },
     format: { type: String, required: true },
     published_date: { type: String, required: true },
-    publisher: { type: String, required: true },
     sale_count: { type: Number, required: true },
+    publisher: { 
+        type: Schema.Types.ObjectId, 
+        ref: "publisher", 
+        required: true 
+    },
     category: { 
         type: Schema.Types.ObjectId, 
         ref: "category", 
