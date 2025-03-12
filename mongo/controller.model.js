@@ -147,7 +147,7 @@ async function deleteBanner(id) {
         const deletedBanner = await bannerModel.findByIdAndDelete(id);
         if (deletedBanner) {
             return { message: 'banner xóa thành công', data: deletedBanner };
-        }else {
+        } else {
             throw new Error('Product not found');
         }
     } catch (error) {
@@ -308,6 +308,12 @@ async function addNewProduct(productData, images) {
         if (!authorFind) {
             throw new Error('Không tìm thấy author');
         }
+
+        // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
+        const publisherFind = await publisherModel.findById(publisher);
+        if (!publisherFind) {
+            throw new Error('Không tìm thấy nxb');
+        }
         const proNew = new productModel({
             name,
             title,
@@ -328,9 +334,8 @@ async function addNewProduct(productData, images) {
         });
         // Nếu hàm insert của bạn hỗ trợ truyền session, hãy dùng:
         const newProduct = await proNew.save();
-        console.log(newProduct);
-        // Nếu không, và insert tự xử lý lưu mà không cần session, giữ nguyên:
-        // const newProduct = await insert([productData]);
+        // console.log(newProduct);
+
         const productId = newProduct._id; // Lấy _id của sản phẩm mới tạo
 
         // Bước 2: Xử lý dữ liệu cho ảnh dựa trên productId vừa tạo
@@ -872,10 +877,17 @@ async function insert(body) {
             throw new Error('Không tìm thấy category', categoryFind);
         }
 
+
         // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
         const authorFind = await authorModel.findById(author);
         if (!authorFind) {
             throw new Error('Không tìm thấy author');
+        }
+
+        // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
+        const publisherFind = await publisherModel.findById(publisher);
+        if (!publisherFind) {
+            throw new Error('Không tìm thấy nxb');
         }
 
         //   const discountFind = await discountModel.findById(discount);
