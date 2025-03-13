@@ -3,31 +3,19 @@ var router = express.Router();
 const discountModel = require('../mongo/discount.model.js');
 const discountController = require('../mongo/controller.model.js');
 
+// Tạo mới discount
+router.post('/', discountController.createDiscount);
 
+// Lấy danh sách discount
+router.get('/', discountController.getAllDiscounts);
 
-router.get('/',async (req,res)=>{
-    try {
-      const result = await discountController.getDiscount(); 
+// Lấy discount theo id
+router.get('/:id', discountController.getDiscountById);
 
-      return res.status(200).json({result})
-    } catch (error) {
-      console.log('lỗi get all discount: ',error);
-      return res.status(500).json({mess: error})
-    }
-  })
+// Cập nhật discount theo id
+router.put('/:id', discountController.updateDiscount);
 
-
-// Thêm discount mới
-router.post('/add', async (req, res) => {
-    try {
-        const body = req.body;
-        const result = await discountController.insertDiscount(body);
-        return res.status(201).json({newDiscount: result});
-    } catch (error) {
-        console.log('Lỗi thêm discount: ', error);
-        return res.status(500).json({mess: error});
-    }
-  });
-  
+// Xóa discount theo id
+router.delete('/:id', discountController.deleteDiscount);
 
 module.exports = router;

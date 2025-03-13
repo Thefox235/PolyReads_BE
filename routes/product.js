@@ -5,6 +5,16 @@ productController = require('../mongo/controller.model.js')
 const checktoken = require('../hepler/checktoken.js')
 /* GET users listing. */
 
+router.put('/apply-discount', async (req, res) => {
+  const { discountId, filter } = req.body; // filter: object chứa điều kiện ví dụ: { category: '...' }
+  try {
+    const result = await productModel.updateMany(filter, { discount: discountId });
+    res.status(200).json({ message: 'Discount applied successfully', result });
+  } catch (error) {
+    console.error("Error applying discount:", error);
+    res.status(500).json({ message: "Error applying discount", error });
+  }
+});
 //lấy tất cả sản phẩm localhost:3000/product/
 router.get('/',async (req,res)=>{
   try {

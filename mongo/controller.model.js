@@ -20,12 +20,105 @@ module.exports = {
     getSimilarProducts, register, login, getHotPro,
     getViewCount, changePassword, forgotPassword,
     getAuthor, insertAuthor, deleteAuthorById, updateAuthorById,
-    checkEmailExists, getOrderByIdUser, insertDiscount, getDiscount,
+    checkEmailExists, getOrderByIdUser, updateDiscount, getDiscountById,
     insertImages, getImages, addNewProduct, getImagesByProductId,
     verifyOTP, getBanners, createBanner, updateBanner,
     deleteBanner, getPublisher, insertPublisher, deletePublisherById,
-    updatePublisherById
+    updatePublisherById, getAllDiscounts, createDiscount, deleteDiscount
 }
+
+// controllers/discountController.js
+
+
+/**
+ * Tạo mới discount
+ */
+async function createDiscount(req, res) {
+  try {
+    const { value, code, start_date, end_date, is_active } = req.body;
+    const discount = new discountModel({ value, code, start_date, end_date, is_active });
+    await discount.save();
+    res.status(201).json({
+      message: "Discount created successfully",
+      discount
+    });
+  } catch (error) {
+    console.error("Error creating discount:", error);
+    res.status(500).json({ message: "Error creating discount", error });
+  }
+};
+
+/**
+ * Lấy danh sách tất cả discount
+ */
+async function getAllDiscounts (req, res) {
+  try {
+    const discounts = await discountModel.find({});
+    res.status(200).json({ discounts });
+  } catch (error) {
+    console.error("Error fetching discounts:", error);
+    res.status(500).json({ message: "Error fetching discounts", error });
+  }
+};
+
+/**
+ * Lấy discount theo id
+ */
+async function getDiscountById (req, res) {
+  try {
+    const { id } = req.params;
+    const discount = await discountModel.findById(id);
+    if (!discount) {
+      return res.status(404).json({ message: "Discount not found" });
+    }
+    res.status(200).json( { discount } );
+  } catch (error) {
+    console.error("Error fetching discount:", error);
+    res.status(500).json({ message: "Error fetching discount", error });
+  }
+};
+
+/**
+ * Cập nhật discount theo id
+ */
+async function updateDiscount (req, res) {
+  try {
+    const { id } = req.params;
+    const { value, code, start_date, end_date, is_active } = req.body;
+    const discount = await discountModel.findByIdAndUpdate(
+      id,
+      { value, code, start_date, end_date, is_active },
+      { new: true }
+    );
+    if (!discount) {
+      return res.status(404).json({ message: "Discount not found" });
+    }
+    res.status(200).json({
+      message: "Discount updated successfully",
+      discount
+    });
+  } catch (error) {
+    console.error("Error updating discount:", error);
+    res.status(500).json({ message: "Error updating discount", error });
+  }
+};
+
+/**
+ * Xóa discount theo id
+ */
+async function deleteDiscount (req, res) {
+  try {
+    const { id } = req.params;
+    const discount = await discountModel.findByIdAndDelete(id);
+    if (!discount) {
+      return res.status(404).json({ message: "Discount not found" });
+    }
+    res.status(200).json({ message: "Discount deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting discount:", error);
+    res.status(500).json({ message: "Error deleting discount", error });
+  }
+};
 
 //hàm sửa nxb
 async function updatePublisherById(id, body) {
@@ -400,35 +493,36 @@ function generateOTP() {
 }
 
 //thêm discount
-async function insertDiscount(body) {
-    try {
-        const { value, code, start_date, end_date, is_active } = body;
-        const newDiscount = new discountModel({
-            value,
-            code,
-            start_date,
-            end_date,
-            is_active
-        });
-        // Lưu vào collection categories
-        const result = await newDiscount.save();
-        return result;
-    } catch (error) {
-        console.log('Lỗi khi thêm discount:', error);
-        throw error;
-    }
-}
+// async function insertDiscount(body) {
+//     try {
+//         const { value, code, start_date, end_date, is_active } = body;
+//         const newDiscount = new discountModel({
+//             value,
+//             code,
+//             start_date,
+//             end_date,
+//             is_active
+//         });
+//         // Lưu vào collection categories
+//         const result = await newDiscount.save();
+//         return result;
+//     } catch (error) {
+//         console.log('Lỗi khi thêm discount:', error);
+//         throw error;
+//     }
+// }
+
 //getAllDiscount
-async function getDiscount(body) {
-    try {
-        const result =
-            await discountModel.find()
-        return result;
-    } catch (error) {
-        console.log('loi GetAllDiscount', error);
-        throw error;
-    }
-}
+// async function getDiscount(body) {
+//     try {
+//         const result =
+//             await discountModel.find()
+//         return result;
+//     } catch (error) {
+//         console.log('loi GetAllDiscount', error);
+//         throw error;
+//     }
+// }
 
 //hàm lấy order từ idUser
 async function getOrderByIdUser(IdUser) {

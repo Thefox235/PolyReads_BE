@@ -38,6 +38,7 @@ var bannerRouter = require('./routes/banner');
 var order_detailRouter = require('./routes/order_detail');
 var commentRouter = require('./routes/comment');
 var publisherRouter = require('./routes/publisher');
+var discountApplyRoutes = require('./routes/discountApplyRoutes');
 
 
 var app = express();
