@@ -13,6 +13,15 @@ router.get('/',async (req,res)=>{
       return res.status(500).json({mess: error})
     }
   })
+  
+// Endpoint gửi OTP khi quên mật khẩu
+router.post('/forgotPass/send-otp', userController.sendForgotPasswordOTP);
+
+// Endpoint xác thực OTP
+router.post('/forgotPass/verify-otp', userController.verifyForgotPasswordOTP);
+
+// Endpoint đổi mật khẩu sau khi xác thực OTP
+router.post('/forgotPass/reset', userController.resetPassword);
 //router để sát thực otp
 router.post('/verify-otp', async (req, res) => {
   try {
@@ -26,6 +35,8 @@ router.post('/verify-otp', async (req, res) => {
     return res.status(500).json({ mess: error.message });
   }
 });
+// Endpoint gửi lại OTP
+router.post('/resend-otp', userController.resendOtp);
  // Router để đổi mật khẩu
 router.post('/changepass',checktoken, async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
@@ -50,45 +61,12 @@ router.post('/forgotPass', async (req, res) => {
 
 //đăng ký localhost:3000/users/regsiter
 // đăng ký localhost:3000/users/register
-router.post('/register', async (req, res) => {
-  try {
-    const { email } = req.body;
-    const emailExists = await userController.checkEmailExists(email);
-    if (emailExists) {
-      return res.status(400).json({ mess: 'Email đã được đăng ký' });
-    }
-    const result = await userController.register(req.body);
-    return res.status(200).json(result);
-  } catch (error) {
-    console.log('lỗi đăng ký: ', error);
-    return res.status(500).json({ mess: error });
-  }
-});
-//đăng nhập localhost:3000/users/login
-router.post('/login',async(req,res)=>{
-  try {
-    const body = req.body
-    const result = await userController.login(body)
-    return res.status(200).json(result)
-  } catch (error) {
-    console.log('lỗi đăng nhập: ',error);
-    return res.status(500).json({mess: error})
-  }
+// Endpoint đăng ký
+router.post('/register', userController.register);
 
-  
-})
+// Endpoint đăng nhập
+router.post('/login', userController.login);
 
-// Thêm một user mới
-router.post('/add', async (req, res) => {
-  try {
-      const body = req.body;
-      const result = await userController.insertUser(body);
-      return res.status(201).json({newUser: result});
-  } catch (error) {
-      console.log('Lỗi thêm user: ', error);
-      return res.status(500).json({mess: error});
-  }
-});
 
 router.delete('/delete/:id', async (req, res) => {
   try {
