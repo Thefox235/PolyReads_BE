@@ -6,6 +6,9 @@ const orderController = require('../mongo/controller.model');
 // Lấy tất cả đơn hàng
 router.get('/', orderController.getOrders);
 
+//lấy order theo user
+router.get('/user/:id', orderController.getOrdersByUserId);
+
 // Lấy đơn hàng theo ID
 router.get('/:id', orderController.getOrderById);
 

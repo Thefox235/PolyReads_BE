@@ -17,6 +17,8 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const JWT_SECRET = process.env.JWT_SECRET || 'kchi';
 const googleClient = new OAuth2Client(CLIENT_ID);
 const paymentModel = require('./payment.model');
+const addressModel = require('./address.model');
+const OrderDetail = require('./order_detail.model');
 const crypto = require('crypto');
 const querystring = require('querystring');
 const axios = require('axios');
@@ -37,290 +39,430 @@ module.exports = {
     deleteComment, updateComment, getComments, createComment,
     resendOtp, resetPassword, verifyForgotPasswordOTP, sendForgotPasswordOTP,
     createVNPayPaymentIntent, createMomoPaymentIntent, deleteOrder,
-    updateOrder, createOrder, getOrderById, getOrders
+    updateOrder, createOrder, getOrderById, getOrders, deleteAddress,
+    updateAddress, createAddress, getAddressById, getAllAddresses,
+    getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId
 }
 
+//
+// Hàm lấy đơn hàng theo userId (ví dụ sử dụng query parameter)
+async function getOrdersByUserId(req, res) {
+    try {
+      const userId = req.params.id;
+      if (!userId) {
+        return res.status(400).json({ message: "Missing userId" });
+      }
+      // Nếu userId ở database là ObjectId, bạn có thể ép chúng về chuỗi để so sánh
+      const orders = await orderModel.find({ userId: userId })
+        .populate('userId')
+        .populate('paymentId')
+        .populate('addressId');
+      res.status(200).json({ orders });
+    } catch (error) {
+      console.error("Lỗi lấy đơn hàng theo userId:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+  
+// Tạo Order Detail mới (tạo nhiều record cho một order)
+async function createOrderDetail(req, res) {
+    try {
+      const { orderId, items } = req.body;
+      console.log("Payload Order Detail:", req.body); // Log payload nhận được
+      if (!items || !Array.isArray(items)) {
+        throw new Error("items phải là một mảng");
+      }
+      const createdItems = await Promise.all(
+        items.map((item) =>
+          OrderDetail.create({
+            orderId,
+            productId: item.productId,
+            quantily: item.quantily, // trường yêu cầu
+            price: item.price,
+          })
+        )
+      );
+      res.status(201).json({ message: "Order details created", orderDetails: createdItems });
+    } catch (error) {
+      console.error("Error creating order details:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+  
+  
+  // Lấy Order Details theo orderId
+  async function getOrderDetailsByOrderId(req, res) {
+    try {
+      const { orderId } = req.params;
+      const orderDetails = await OrderDetail.find({ orderId })
+        .populate("productId"); // Nếu muốn lấy thông tin sản phẩm
+      res.status(200).json({ orderDetails });
+    } catch (error) {
+      console.error("Error getting order details:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+//
+async function getAllAddresses(req, res) {
+    try {
+        // Nếu muốn, bạn có thể lọc theo userId bằng req.query.userId
+        // Ví dụ: const filter = req.query.userId ? { userId: req.query.userId } : {};
+        const addresses = await addressModel.find();
+        return res.status(200).json({ addresses });
+    } catch (error) {
+        console.error("Lỗi lấy danh sách địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
+    }
+};
+
+// Lấy địa chỉ theo ID
+async function getAddressById (req, res)  {
+    try {
+        const { id } = req.params;
+        const address = await addressModel.findById(id);
+        if (!address) {
+            return res.status(404).json({ mess: "Không tìm thấy địa chỉ" });
+        }
+        return res.status(200).json({ address });
+    } catch (error) {
+        console.error("Lỗi lấy địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
+    }
+};
+
+// Tạo địa chỉ mới
+async function createAddress (req, res) {
+    try {
+        // Các dữ liệu cần thiết sẽ được gửi qua req.body
+        const newAddress = new addressModel(req.body);
+        const savedAddress = await newAddress.save();
+        return res
+            .status(201)
+            .json({ mess: "Địa chỉ được tạo thành công", address: savedAddress });
+    } catch (error) {
+        console.error("Lỗi tạo địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
+    }
+};
+
+// Cập nhật địa chỉ theo ID
+async function updateAddress (req, res) {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+        const updatedAddress = await addressModel.findByIdAndUpdate(id, updateData, {
+            new: true,
+            runValidators: true,
+        });
+        if (!updatedAddress) {
+            return res.status(404).json({ mess: "Không tìm thấy địa chỉ để cập nhật" });
+        }
+        return res
+            .status(200)
+            .json({ mess: "Địa chỉ được cập nhật thành công", address: updatedAddress });
+    } catch (error) {
+        console.error("Lỗi cập nhật địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
+    }
+};
+
+// Xóa địa chỉ theo ID
+async function deleteAddress (req, res) {
+    try {
+        const { id } = req.params;
+        const deletedAddress = await addressModel.findByIdAndDelete(id);
+        if (!deletedAddress) {
+            return res.status(404).json({ mess: "Không tìm thấy địa chỉ để xóa" });
+        }
+        return res
+            .status(200)
+            .json({ mess: "Địa chỉ đã được xóa thành công" });
+    } catch (error) {
+        console.error("Lỗi xóa địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
+    }
+};
 // Lấy tất cả đơn hàng
 async function getOrders(req, res) {
-  try {
-    // Sử dụng populate để lấy thông tin liên quan nếu cần
-    const orders = await orderModel.find()
-      .populate('userId')
-      .populate('paymentId')
-      .populate('addressId');
-    res.status(200).json({ orders });
-  } catch (error) {
-    console.error("Lỗi lấy danh sách order:", error);
-    res.status(500).json({ message: error.message });
-  }
+    try {
+        // Sử dụng populate để lấy thông tin liên quan nếu cần
+        const orders = await orderModel.find()
+            .populate('userId')
+            .populate('paymentId')
+            .populate('addressId');
+        res.status(200).json({ orders });
+    } catch (error) {
+        console.error("Lỗi lấy danh sách order:", error);
+        res.status(500).json({ message: error.message });
+    }
 };
 
 // Lấy đơn hàng theo ID
-async function getOrderById (req, res) {
-  try {
-    const orderId = req.params.id;
-    const order = await orderModel.findById(orderId)
-      .populate('userId')
-      .populate('paymentId')
-      .populate('addressId');
-    if (!order) {
-      return res.status(404).json({ message: "Không tìm thấy Order" });
+async function getOrderById(req, res) {
+    try {
+        const orderId = req.params.id;
+        const order = await orderModel.findById(orderId)
+            .populate('userId')
+            .populate('paymentId')
+            .populate('addressId');
+        if (!order) {
+            return res.status(404).json({ message: "Không tìm thấy Order" });
+        }
+        res.status(200).json({ order });
+    } catch (error) {
+        console.error("Lỗi lấy order:", error);
+        res.status(500).json({ message: error.message });
     }
-    res.status(200).json({ order });
-  } catch (error) {
-    console.error("Lỗi lấy order:", error);
-    res.status(500).json({ message: error.message });
-  }
 };
 
 // Tạo đơn hàng mới
-async function createOrder (req, res) {
-  try {
-    const {
-      name,
-      quantity,
-      img,
-      price,
-      status,
-      payment_status,
-      total,
-      userId,
-      paymentId,
-      addressId
-    } = req.body;
+async function createOrder(req, res) {
+    try {
+        const {
+            name,
+            quantity,
+            img,
+            price,
+            status,
+            payment_status,
+            total,
+            userId,
+            paymentId,
+            addressId
+        } = req.body;
 
-    const newOrder = new orderModel({
-      name,
-      quantity,
-      img,
-      price,
-      status,
-      payment_status,
-      total,
-      userId,
-      paymentId,
-      addressId,
-      date: new Date()
-    });
+        const newOrder = new orderModel({
+            name,
+            quantity,
+            img,
+            price,
+            status,
+            payment_status,
+            total,
+            userId,
+            paymentId,
+            addressId,
+            date: new Date()
+        });
 
-    const savedOrder = await newOrder.save();
-    res.status(201).json({ message: "Order được tạo thành công", order: savedOrder });
-  } catch (error) {
-    console.error("Lỗi tạo order:", error);
-    res.status(500).json({ message: error.message });
-  }
+        const savedOrder = await newOrder.save();
+        res.status(201).json({ message: "Order được tạo thành công", order: savedOrder });
+    } catch (error) {
+        console.error("Lỗi tạo order:", error);
+        res.status(500).json({ message: error.message });
+    }
 };
 
 // Cập nhật Order theo ID
-async function updateOrder (req, res) {
-  try {
-    const orderId = req.params.id;
-    const updateData = req.body;
-    const updatedOrder = await orderModel.findByIdAndUpdate(orderId, updateData, { new: true, runValidators: true });
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Không tìm thấy Order để cập nhật" });
+async function updateOrder(req, res) {
+    try {
+        const orderId = req.params.id;
+        const updateData = req.body;
+        const updatedOrder = await orderModel.findByIdAndUpdate(orderId, updateData, { new: true, runValidators: true });
+        if (!updatedOrder) {
+            return res.status(404).json({ message: "Không tìm thấy Order để cập nhật" });
+        }
+        res.status(200).json({ message: "Order được cập nhật thành công", order: updatedOrder });
+    } catch (error) {
+        console.error("Lỗi cập nhật order:", error);
+        res.status(500).json({ message: error.message });
     }
-    res.status(200).json({ message: "Order được cập nhật thành công", order: updatedOrder });
-  } catch (error) {
-    console.error("Lỗi cập nhật order:", error);
-    res.status(500).json({ message: error.message });
-  }
 };
 
 // Xóa Order theo ID
-async function deleteOrder (req, res) {
-  try {
-    const orderId = req.params.id;
-    const deletedOrder = await orderModel.findByIdAndDelete(orderId);
-    if (!deletedOrder) {
-      return res.status(404).json({ message: "Không tìm thấy Order để xóa" });
+async function deleteOrder(req, res) {
+    try {
+        const orderId = req.params.id;
+        const deletedOrder = await orderModel.findByIdAndDelete(orderId);
+        if (!deletedOrder) {
+            return res.status(404).json({ message: "Không tìm thấy Order để xóa" });
+        }
+        res.status(200).json({ message: "Order đã được xóa thành công" });
+    } catch (error) {
+        console.error("Lỗi xóa order:", error);
+        res.status(500).json({ message: error.message });
     }
-    res.status(200).json({ message: "Order đã được xóa thành công" });
-  } catch (error) {
-    console.error("Lỗi xóa order:", error);
-    res.status(500).json({ message: error.message });
-  }
 };
 
 //
 async function createMomoPaymentIntent(req, res) {
     try {
-      // Lấy dữ liệu từ request (ví dụ orderId, amount, orderInfo)
-      const { orderId, amount, orderInfo } = req.body;
-      
-      // Các thông số MoMo (nên đặt trong .env)
-      const partnerCode = process.env.MOMO_PARTNER_CODE;
-      const accessKey = process.env.MOMO_ACCESS_KEY;
-      const secretKey = process.env.MOMO_SECRET_KEY;
-      const requestId = partnerCode + new Date().getTime();
-      const redirectUrl = process.env.MOMO_REDIRECT_URL;
-      const ipnUrl = process.env.MOMO_IPN_URL;
-      const extraData = ""; // có thể để rỗng hoặc mã hóa thông tin bổ sung
-      
-      // Tạo chuỗi ký theo định dạng yêu cầu của MoMo
-      // Ví dụ chuỗi: "partnerCode=MOMO_PARTNER_CODE&accessKey=...&requestId=...&amount=...&orderId=...&orderInfo=...&redirectUrl=...&ipnUrl=...&extraData="
-      const rawSignature = `partnerCode=${partnerCode}&accessKey=${accessKey}&requestId=${requestId}&amount=${amount}&orderId=${orderId}&orderInfo=${orderInfo}&redirectUrl=${redirectUrl}&ipnUrl=${ipnUrl}&extraData=${extraData}`;
-      
-      // Tạo signature bằng HMAC SHA256
-      const signature = crypto.createHmac('sha256', secretKey)
-                              .update(rawSignature)
-                              .digest('hex');
-      
-      // Xây dựng payload gửi lên MoMo
-      const requestBody = {
-        partnerCode,
-        accessKey,
-        requestId,
-        amount,
-        orderId,
-        orderInfo,
-        redirectUrl,
-        ipnUrl,
-        extraData,
-        requestType: "captureMoMoWallet", // hoặc "payWithMoMo" tùy API đang sử dụng
-        signature
-      };
-  
-      // Gọi API của MoMo (thường là endpoint test)
-      const momoEndpoint = process.env.MOMO_ENDPOINT; // ví dụ: https://test-payment.momo.vn/gw_payment/transactionProcessor
-      const response = await axios.post(momoEndpoint, requestBody);
-      
-      // Trả về dữ liệu từ MoMo, thường bao gồm URL thanh toán
-      return res.status(200).json(response.data);
+        // Lấy dữ liệu từ request (ví dụ orderId, amount, orderInfo)
+        const { orderId, amount, orderInfo } = req.body;
+
+        // Các thông số MoMo (nên đặt trong .env)
+        const partnerCode = process.env.MOMO_PARTNER_CODE;
+        const accessKey = process.env.MOMO_ACCESS_KEY;
+        const secretKey = process.env.MOMO_SECRET_KEY;
+        const requestId = partnerCode + new Date().getTime();
+        const redirectUrl = process.env.MOMO_REDIRECT_URL;
+        const ipnUrl = process.env.MOMO_IPN_URL;
+        const extraData = ""; // có thể để rỗng hoặc mã hóa thông tin bổ sung
+
+        // Tạo chuỗi ký theo định dạng yêu cầu của MoMo
+        // Ví dụ chuỗi: "partnerCode=MOMO_PARTNER_CODE&accessKey=...&requestId=...&amount=...&orderId=...&orderInfo=...&redirectUrl=...&ipnUrl=...&extraData="
+        const rawSignature = `partnerCode=${partnerCode}&accessKey=${accessKey}&requestId=${requestId}&amount=${amount}&orderId=${orderId}&orderInfo=${orderInfo}&redirectUrl=${redirectUrl}&ipnUrl=${ipnUrl}&extraData=${extraData}`;
+
+        // Tạo signature bằng HMAC SHA256
+        const signature = crypto.createHmac('sha256', secretKey)
+            .update(rawSignature)
+            .digest('hex');
+
+        // Xây dựng payload gửi lên MoMo
+        const requestBody = {
+            partnerCode,
+            accessKey,
+            requestId,
+            amount,
+            orderId,
+            orderInfo,
+            redirectUrl,
+            ipnUrl,
+            extraData,
+            requestType: "captureMoMoWallet", // hoặc "payWithMoMo" tùy API đang sử dụng
+            signature
+        };
+
+        // Gọi API của MoMo (thường là endpoint test)
+        const momoEndpoint = process.env.MOMO_ENDPOINT; // ví dụ: https://test-payment.momo.vn/gw_payment/transactionProcessor
+        const response = await axios.post(momoEndpoint, requestBody);
+
+        // Trả về dữ liệu từ MoMo, thường bao gồm URL thanh toán
+        return res.status(200).json(response.data);
     } catch (error) {
-      console.error("Lỗi tạo MoMo payment:", error.message);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi tạo MoMo payment:", error.message);
+        return res.status(500).json({ mess: error.message });
     }
-  }
+}
 //thánh toán vn pay
 async function createVNPayPaymentIntent(req, res) {
-  try {
-    // Ví dụ: lấy thông tin đơn hàng từ request
-    const { orderId, amount, orderInfo } = req.body;
-    // VNPay yêu cầu số tiền tính theo đơn vị nhỏ nhất (nếu VND thì nhân 100)
-    const vnp_Amount = amount * 100;
-    // Các tham số cần gửi tới VNPay
-    let vnp_Params = {
-      vnp_Version: '2.0.0',
-      vnp_Command: 'pay',
-      vnp_TmnCode: process.env.VNP_TMN_CODE,
-      vnp_Amount: vnp_Amount,
-      vnp_CurrCode: 'VND',
-      vnp_TxnRef: orderId, // mã đơn hàng duy nhất
-      vnp_OrderInfo: orderInfo || 'Thanh toán đơn hàng',
-      vnp_OrderType: 'other', // loại đơn, có thể tuỳ chỉnh theo nghiệp vụ
-      vnp_Locale: 'vn',
-      vnp_ReturnUrl: process.env.VNP_RETURN_URL,
-      vnp_IpAddr: req.ip,
-      vnp_CreateDate: new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14) // Format: YYYYMMDDHHMMSS
-    };
+    try {
+        // Ví dụ: lấy thông tin đơn hàng từ request
+        const { orderId, amount, orderInfo } = req.body;
+        // VNPay yêu cầu số tiền tính theo đơn vị nhỏ nhất (nếu VND thì nhân 100)
+        const vnp_Amount = amount * 100;
+        // Các tham số cần gửi tới VNPay
+        let vnp_Params = {
+            vnp_Version: '2.0.0',
+            vnp_Command: 'pay',
+            vnp_TmnCode: process.env.VNP_TMN_CODE,
+            vnp_Amount: vnp_Amount,
+            vnp_CurrCode: 'VND',
+            vnp_TxnRef: orderId, // mã đơn hàng duy nhất
+            vnp_OrderInfo: orderInfo || 'Thanh toán đơn hàng',
+            vnp_OrderType: 'other', // loại đơn, có thể tuỳ chỉnh theo nghiệp vụ
+            vnp_Locale: 'vn',
+            vnp_ReturnUrl: process.env.VNP_RETURN_URL,
+            vnp_IpAddr: req.ip,
+            vnp_CreateDate: new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14) // Format: YYYYMMDDHHMMSS
+        };
 
-    // Sắp xếp các tham số theo thứ tự từ điển
-    vnp_Params = sortObject(vnp_Params);
+        // Sắp xếp các tham số theo thứ tự từ điển
+        vnp_Params = sortObject(vnp_Params);
 
-    // Tạo chuỗi query (không mã hóa giá trị) để ký số
-    const signData = querystring.stringify(vnp_Params, null, null, {
-      encodeURIComponent: (str) => str
-    });
-    // Tạo secure hash bằng HMAC SHA512
-    const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
-    const secureHash = hmac.update(signData).digest("hex");
+        // Tạo chuỗi query (không mã hóa giá trị) để ký số
+        const signData = querystring.stringify(vnp_Params, null, null, {
+            encodeURIComponent: (str) => str
+        });
+        // Tạo secure hash bằng HMAC SHA512
+        const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
+        const secureHash = hmac.update(signData).digest("hex");
 
-    // Thêm secureHash vào tham số
-    vnp_Params.vnp_SecureHash = secureHash;
+        // Thêm secureHash vào tham số
+        vnp_Params.vnp_SecureHash = secureHash;
 
-    // Tạo URL thanh toán VNPay
-    const paymentUrl = `${process.env.VNP_PAY_URL}?${querystring.stringify(vnp_Params)}`;
+        // Tạo URL thanh toán VNPay
+        const paymentUrl = `${process.env.VNP_PAY_URL}?${querystring.stringify(vnp_Params)}`;
 
-    return res.status(200).json({ paymentUrl });
-  } catch (error) {
-    console.error("Lỗi tạo Payment VNPay:", error);
-    return res.status(500).json({ message: error.message });
-  }
+        return res.status(200).json({ paymentUrl });
+    } catch (error) {
+        console.error("Lỗi tạo Payment VNPay:", error);
+        return res.status(500).json({ message: error.message });
+    }
 }
 
 // Hàm sắp xếp object theo key (theo thứ tự từ điển)
 function sortObject(obj) {
-  let sorted = {};
-  Object.keys(obj)
-    .sort()
-    .forEach((key) => {
-      sorted[key] = obj[key];
-    });
-  return sorted;
+    let sorted = {};
+    Object.keys(obj)
+        .sort()
+        .forEach((key) => {
+            sorted[key] = obj[key];
+        });
+    return sorted;
 }
 
 //
 async function resetPassword(req, res) {
     try {
-      const { email, newPassword } = req.body;
-      if (!email || !newPassword) {
-        return res.status(400).json({ mess: "Thiếu email hoặc mật khẩu mới" });
-      }
-      // Gọi hàm forgotPassword mà bạn đã có để cập nhật mật khẩu
-      const result = await forgotPassword(email, newPassword);
-      return res.status(200).json({ mess: "Mật khẩu đã được đặt lại thành công", result });
+        const { email, newPassword } = req.body;
+        if (!email || !newPassword) {
+            return res.status(400).json({ mess: "Thiếu email hoặc mật khẩu mới" });
+        }
+        // Gọi hàm forgotPassword mà bạn đã có để cập nhật mật khẩu
+        const result = await forgotPassword(email, newPassword);
+        return res.status(200).json({ mess: "Mật khẩu đã được đặt lại thành công", result });
     } catch (error) {
-      console.error("Lỗi reset mật khẩu:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi reset mật khẩu:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
+}
 //
 async function verifyForgotPasswordOTP(req, res) {
     try {
-      const { email, otp } = req.body;
-      if (!email || !otp) {
-        return res.status(400).json({ mess: "Thiếu email hoặc OTP" });
-      }
-      const user = await userModel.findOne({ email: email.trim().toLowerCase() });
-      if (!user) {
-        return res.status(400).json({ mess: "Người dùng không tồn tại" });
-      }
-      if (user.otp_code !== otp) {
-        return res.status(400).json({ mess: "OTP không chính xác" });
-      }
-      // Nếu xác thực thành công, có thể trả về một token tạm thời hoặc thông báo thành công
-      return res.status(200).json({ verified: true, mess: "OTP xác thực thành công" });
+        const { email, otp } = req.body;
+        if (!email || !otp) {
+            return res.status(400).json({ mess: "Thiếu email hoặc OTP" });
+        }
+        const user = await userModel.findOne({ email: email.trim().toLowerCase() });
+        if (!user) {
+            return res.status(400).json({ mess: "Người dùng không tồn tại" });
+        }
+        if (user.otp_code !== otp) {
+            return res.status(400).json({ mess: "OTP không chính xác" });
+        }
+        // Nếu xác thực thành công, có thể trả về một token tạm thời hoặc thông báo thành công
+        return res.status(200).json({ verified: true, mess: "OTP xác thực thành công" });
     } catch (error) {
-      console.error("Lỗi xác thực OTP:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi xác thực OTP:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
+}
 //
 async function sendForgotPasswordOTP(req, res) {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ mess: "Thiếu email" });
-      }
-      
-      // Tìm người dùng theo email (ép về lowercase để đảm bảo nhất quán)
-      const user = await userModel.findOne({ email: email.trim().toLowerCase() });
-      if (!user) {
-        return res.status(400).json({ mess: "Người dùng không tồn tại" });
-      }
-      
-      // Tạo OTP (ví dụ: mã 6 chữ số)
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Cập nhật OTP vào database (bạn cũng có thể lưu thời gian hết hạn nếu cần)
-      user.otp_code = otpCode;
-      await user.save();
-      
-      // Gửi OTP qua email
-      await sendMail({
-        email: user.email,
-        subject: "OTP đặt lại mật khẩu",
-        text: `Mã OTP của bạn là: ${otpCode}`,
-        html: `<p>Mã OTP của bạn là: <strong>${otpCode}</strong></p>`
-      });
-      
-      return res.status(200).json({ mess: "OTP đã được gửi tới email của bạn" });
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ mess: "Thiếu email" });
+        }
+
+        // Tìm người dùng theo email (ép về lowercase để đảm bảo nhất quán)
+        const user = await userModel.findOne({ email: email.trim().toLowerCase() });
+        if (!user) {
+            return res.status(400).json({ mess: "Người dùng không tồn tại" });
+        }
+
+        // Tạo OTP (ví dụ: mã 6 chữ số)
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Cập nhật OTP vào database (bạn cũng có thể lưu thời gian hết hạn nếu cần)
+        user.otp_code = otpCode;
+        await user.save();
+
+        // Gửi OTP qua email
+        await sendMail({
+            email: user.email,
+            subject: "OTP đặt lại mật khẩu",
+            text: `Mã OTP của bạn là: ${otpCode}`,
+            html: `<p>Mã OTP của bạn là: <strong>${otpCode}</strong></p>`
+        });
+
+        return res.status(200).json({ mess: "OTP đã được gửi tới email của bạn" });
     } catch (error) {
-      console.error("Lỗi gửi OTP quên mật khẩu:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi gửi OTP quên mật khẩu:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
+}
 //tạo comment
 async function createComment(req, res) {
     try {
@@ -1059,198 +1201,198 @@ async function getHotPro() {
 
 async function resendOtp(req, res) {
     try {
-      const { userId } = req.body;
-      if (!userId) {
-        return res.status(400).json({ mess: "Thiếu thông tin userId" });
-      }
-      const user = await userModel.findById(userId);
-      if (!user) {
-        return res.status(404).json({ mess: "Không tìm thấy user" });
-      }
-      // Tạo OTP mới (6 chữ số)
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      user.otp_code = otpCode;
-      await user.save();
-      // Gửi mail OTP
-      await sendMail({
-        email: user.email,
-        subject: "OTP Xác Thực Mới",
-        text: `Mã OTP của bạn là: ${otpCode}`,
-        html: `<p>Mã OTP của bạn là: <strong>${otpCode}</strong></p>`
-      });
-      return res.status(200).json({ mess: "Mã OTP đã được gửi lại thành công" });
-    } catch (error) {
-      console.error("Lỗi gửi lại OTP:", error);
-      return res.status(500).json({ mess: error.message });
-    }
-  }
-  async function register(req, res) {
-    try {
-      const { email, googleToken } = req.body;
-      if (googleToken) {
-        // Đăng ký qua Google sử dụng access token
-        // Thay vì verifyIdToken, gọi API userinfo để lấy thông tin người dùng
-        const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-          headers: {
-            'Authorization': `Bearer ${googleToken}`
-          }
-        });
-        const payload = await response.json();
-        // payload bây giờ chứa email, name, picture,...
-        
-        // Kiểm tra xem email đã tồn tại chưa
-        const userExists = await userModel.findOne({ email: payload.email });
-        if (userExists) {
-          return res.status(400).json({ mess: 'Email đã được đăng ký' });
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(400).json({ mess: "Thiếu thông tin userId" });
         }
-        
-        // Tạo mật khẩu ngẫu nhiên
-        const randomPass = Math.random().toString(36).substring(2);
-        const hashedPassword = bcrypt.hashSync(randomPass, 10);
-        
-        // Xử lý số điện thoại và avatar mặc định
-        const defaultPhone = "000";
-        const defaultAvatarUrl = "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg";
-        const avatarUrl = payload.picture ? payload.picture : defaultAvatarUrl;
-        
-        const newUser = new userModel({
-          _id: new mongoose.Types.ObjectId(),
-          email: payload.email,
-          pass: hashedPassword,
-          name: payload.name,
-          phone: defaultPhone, // gán số mặc định khi Google không cung cấp
-          url_image: avatarUrl,
-          role: '0',
-          is_verified: true
-        });
-        const savedUser = await newUser.save();
-        
-        // Tạo JWT token cho user
-        const token = jwt.sign(
-          { _id: savedUser._id, email: savedUser.email, role: savedUser.role },
-          JWT_SECRET,
-          { expiresIn: 3600 }
-        );
-        return res.status(200).json({ ...savedUser._doc, token });
-      } else {
-        // Đăng ký thông thường với OTP
-        const existingUser = await userModel.findOne({ email: req.body.email });
-        if (existingUser) {
-          return res.status(400).json({ mess: 'Email đã được đăng ký' });
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({ mess: "Không tìm thấy user" });
         }
-  
-        // Tạo OTP (ví dụ: mã 6 chữ số)
+        // Tạo OTP mới (6 chữ số)
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  
-        // Kiểm tra trường pass để đảm bảo có giá trị hợp lệ
-        if (!req.body.pass) {
-          return res.status(400).json({ mess: 'Thiếu trường mật khẩu' });
-        }
-  
-        // Hash mật khẩu
-        const hashedPassword = bcrypt.hashSync(req.body.pass, 10);
-  
-        const newUser = new userModel({
-          _id: new mongoose.Types.ObjectId(),
-          email: req.body.email,
-          pass: hashedPassword,
-          name: req.body.name,
-          phone: req.body.phone, // Đối với đăng ký thông thường, người dùng phải nhập phone
-          url_image: 'https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg',
-          role: req.body.role || '0',
-          is_verified: false,
-          otp_code: otpCode
-        });
-        const savedUser = await newUser.save();
-  
-        try {
-          await sendMail({
-            email: req.body.email,
-            subject: "OTP của bạn",
+        user.otp_code = otpCode;
+        await user.save();
+        // Gửi mail OTP
+        await sendMail({
+            email: user.email,
+            subject: "OTP Xác Thực Mới",
             text: `Mã OTP của bạn là: ${otpCode}`,
             html: `<p>Mã OTP của bạn là: <strong>${otpCode}</strong></p>`
-          });
-        } catch (emailError) {
-          console.error("Gửi email OTP thất bại:", emailError);
-        }
-  
-        return res.status(200).json({
-          mess: 'Đăng ký thành công! Vui lòng kiểm tra email để xác thực OTP.'
         });
-      }
+        return res.status(200).json({ mess: "Mã OTP đã được gửi lại thành công" });
     } catch (error) {
-      console.error("Lỗi đăng ký:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi gửi lại OTP:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
-  
+}
+async function register(req, res) {
+    try {
+        const { email, googleToken } = req.body;
+        if (googleToken) {
+            // Đăng ký qua Google sử dụng access token
+            // Thay vì verifyIdToken, gọi API userinfo để lấy thông tin người dùng
+            const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+                headers: {
+                    'Authorization': `Bearer ${googleToken}`
+                }
+            });
+            const payload = await response.json();
+            // payload bây giờ chứa email, name, picture,...
+
+            // Kiểm tra xem email đã tồn tại chưa
+            const userExists = await userModel.findOne({ email: payload.email });
+            if (userExists) {
+                return res.status(400).json({ mess: 'Email đã được đăng ký' });
+            }
+
+            // Tạo mật khẩu ngẫu nhiên
+            const randomPass = Math.random().toString(36).substring(2);
+            const hashedPassword = bcrypt.hashSync(randomPass, 10);
+
+            // Xử lý số điện thoại và avatar mặc định
+            const defaultPhone = "000";
+            const defaultAvatarUrl = "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg";
+            const avatarUrl = payload.picture ? payload.picture : defaultAvatarUrl;
+
+            const newUser = new userModel({
+                _id: new mongoose.Types.ObjectId(),
+                email: payload.email,
+                pass: hashedPassword,
+                name: payload.name,
+                phone: defaultPhone, // gán số mặc định khi Google không cung cấp
+                url_image: avatarUrl,
+                role: '0',
+                is_verified: true
+            });
+            const savedUser = await newUser.save();
+
+            // Tạo JWT token cho user
+            const token = jwt.sign(
+                { _id: savedUser._id, email: savedUser.email, role: savedUser.role },
+                JWT_SECRET,
+                { expiresIn: 3600 }
+            );
+            return res.status(200).json({ ...savedUser._doc, token });
+        } else {
+            // Đăng ký thông thường với OTP
+            const existingUser = await userModel.findOne({ email: req.body.email });
+            if (existingUser) {
+                return res.status(400).json({ mess: 'Email đã được đăng ký' });
+            }
+
+            // Tạo OTP (ví dụ: mã 6 chữ số)
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+            // Kiểm tra trường pass để đảm bảo có giá trị hợp lệ
+            if (!req.body.pass) {
+                return res.status(400).json({ mess: 'Thiếu trường mật khẩu' });
+            }
+
+            // Hash mật khẩu
+            const hashedPassword = bcrypt.hashSync(req.body.pass, 10);
+
+            const newUser = new userModel({
+                _id: new mongoose.Types.ObjectId(),
+                email: req.body.email,
+                pass: hashedPassword,
+                name: req.body.name,
+                phone: req.body.phone, // Đối với đăng ký thông thường, người dùng phải nhập phone
+                url_image: 'https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg',
+                role: req.body.role || '0',
+                is_verified: false,
+                otp_code: otpCode
+            });
+            const savedUser = await newUser.save();
+
+            try {
+                await sendMail({
+                    email: req.body.email,
+                    subject: "OTP của bạn",
+                    text: `Mã OTP của bạn là: ${otpCode}`,
+                    html: `<p>Mã OTP của bạn là: <strong>${otpCode}</strong></p>`
+                });
+            } catch (emailError) {
+                console.error("Gửi email OTP thất bại:", emailError);
+            }
+
+            return res.status(200).json({
+                mess: 'Đăng ký thành công! Vui lòng kiểm tra email để xác thực OTP.'
+            });
+        }
+    } catch (error) {
+        console.error("Lỗi đăng ký:", error);
+        return res.status(500).json({ mess: error.message });
+    }
+}
+
 
 /**
  * Hàm đăng nhập (login): Hỗ trợ đăng nhập thông thường và qua Google.
  */
 async function login(req, res) {
     try {
-      const { googleToken, email, pass } = req.body;
-      let user;
-      if (googleToken) {
-        // Xử lý đăng nhập qua Google sử dụng access token:
-        // Thay vì verifyIdToken, sử dụng endpoint userinfo để lấy thông tin người dùng
-        const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-          headers: {
-            'Authorization': `Bearer ${googleToken}`
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Không thể lấy thông tin người dùng từ Google");
+        const { googleToken, email, pass } = req.body;
+        let user;
+        if (googleToken) {
+            // Xử lý đăng nhập qua Google sử dụng access token:
+            // Thay vì verifyIdToken, sử dụng endpoint userinfo để lấy thông tin người dùng
+            const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+                headers: {
+                    'Authorization': `Bearer ${googleToken}`
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Không thể lấy thông tin người dùng từ Google");
+            }
+            const payload = await response.json();
+            // payload sẽ có dạng:
+            // {
+            //   email: "...",
+            //   name: "...",
+            //   picture: "...",
+            //   ... các trường khác
+            // }
+
+            // Tìm user dựa trên email trả về từ Google
+            user = await userModel.findOne({ email: payload.email });
+            if (!user) {
+                // Nếu user chưa tồn tại, tự động đăng ký với thông tin mặc định
+                const randomPass = Math.random().toString(36).substring(2);
+                const hashedPassword = bcrypt.hashSync(randomPass, 10);
+                user = new userModel({
+                    _id: new mongoose.Types.ObjectId(),
+                    email: payload.email,
+                    pass: hashedPassword,
+                    name: payload.name || payload.email.split('@')[0],
+                    phone: "000", // Gán số điện thoại mặc định vì Google không cung cấp
+                    url_image: payload.picture || "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
+                    role: '0',
+                    is_verified: true,
+                });
+                user = await user.save();
+            }
+        } else {
+            // Xử lý đăng nhập truyền thống
+            user = await userModel.findOne({ email });
+            if (!user) throw new Error('Email không tồn tại!');
+            const isMatch = bcrypt.compareSync(pass, user.pass);
+            if (!isMatch) throw new Error('Mật khẩu không chính xác');
         }
-        const payload = await response.json();
-        // payload sẽ có dạng:
-        // {
-        //   email: "...",
-        //   name: "...",
-        //   picture: "...",
-        //   ... các trường khác
-        // }
-  
-        // Tìm user dựa trên email trả về từ Google
-        user = await userModel.findOne({ email: payload.email });
-        if (!user) {
-          // Nếu user chưa tồn tại, tự động đăng ký với thông tin mặc định
-          const randomPass = Math.random().toString(36).substring(2);
-          const hashedPassword = bcrypt.hashSync(randomPass, 10);
-          user = new userModel({
-            _id: new mongoose.Types.ObjectId(),
-            email: payload.email,
-            pass: hashedPassword,
-            name: payload.name || payload.email.split('@')[0],
-            phone: "000", // Gán số điện thoại mặc định vì Google không cung cấp
-            url_image: payload.picture || "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
-            role: '0',
-            is_verified: true,
-          });
-          user = await user.save();
-        }
-      } else {
-        // Xử lý đăng nhập truyền thống
-        user = await userModel.findOne({ email });
-        if (!user) throw new Error('Email không tồn tại!');
-        const isMatch = bcrypt.compareSync(pass, user.pass);
-        if (!isMatch) throw new Error('Mật khẩu không chính xác');
-      }
-      // Tạo JWT cho user
-      const token = jwt.sign(
-        { _id: user._id, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: 3600 }
-      );
-      user = user.toObject();
-      delete user.pass;
-      return res.status(200).json({ ...user, token });
+        // Tạo JWT cho user
+        const token = jwt.sign(
+            { _id: user._id, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: 3600 }
+        );
+        user = user.toObject();
+        delete user.pass;
+        return res.status(200).json({ ...user, token });
     } catch (error) {
-      console.error("Lỗi đăng nhập:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi đăng nhập:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
+}
 
 
 async function getSimilarProducts(categoryId) {
@@ -1311,7 +1453,7 @@ async function updateUserById(id, body) {
     try {
         const pro = await userModel.findById(id);
         if (!pro) {
-            throw new Error('Không tìm thấy danh mục');
+            throw new Error('Không tìm thấy user');
         }
         const { email, pass, name, phone, role, address } = body;
         const result = await userModel.findByIdAndUpdate(
@@ -1319,6 +1461,7 @@ async function updateUserById(id, body) {
             { email, pass, name, phone, role, address },
             { new: true }
         );
+        // Trả về trực tiếp object result thay vì { Products: result }
         return result;
     } catch (error) {
         console.log('Lỗi update theo id', error);

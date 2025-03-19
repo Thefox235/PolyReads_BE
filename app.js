@@ -71,7 +71,7 @@ app.use ('/post',postRouter);
 app.use ('/images',imagesRouter);
 app.use ('/discount',discountRouter);
 app.use ('/banner',bannerRouter);
-app.use ('/order_detail',order_detailRouter);
+app.use ('/order-detail',order_detailRouter);
 app.use ('/comment',commentRouter);
 app.use ('/publisher',publisherRouter);
 

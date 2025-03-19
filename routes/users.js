@@ -84,7 +84,7 @@ router.put('/:id',async (req,res)=>{
     const {id} = req.params;
     const body = req.body;
     const pro = await userController.updateUserById(id,body)
-    return res.status(200).json({Products: pro})
+    return res.status(200).json({user: pro})
   } catch (error) {
     console.log('lỗi update: ',error);
     return res.status(500).json({mess: error});
