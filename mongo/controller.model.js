@@ -514,8 +514,6 @@ async function getComments(req, res) {
     }
 };
 //sửa comment
-// Giả sử file model comment được lưu tại './models/comment.js'
-const Comment = require('./models/comment');
 
 async function updateComment(req, res) {
   try {
@@ -549,7 +547,7 @@ async function updateComment(req, res) {
     }
 
     // Cập nhật comment theo id
-    const updatedComment = await Comment.findByIdAndUpdate(
+    const updatedComment = await commentModel.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
