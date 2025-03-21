@@ -466,7 +466,7 @@ async function sendForgotPasswordOTP(req, res) {
 //tạo comment
 async function createComment(req, res) {
     try {
-        const { userId, productId, content } = req.body;
+        const { userId, productId, content, rating } = req.body;
 
         // Kiểm tra sự tồn tại của User
         const user = await userModel.findById(userId);
@@ -486,7 +486,8 @@ async function createComment(req, res) {
             productId,
             content,
             date: Date.now(),          // Thời gian hiện tại
-            status: "pending"          // Trạng thái mặc định, bạn có thể thay đổi thành "approved" nếu cần
+            status: "pending",
+            rating          // Trạng thái mặc định, bạn có thể thay đổi thành "approved" nếu cần
         });
         await comment.save();
 
@@ -513,24 +514,62 @@ async function getComments(req, res) {
     }
 };
 //sửa comment
+// Giả sử file model comment được lưu tại './models/comment.js'
+const Comment = require('./models/comment');
+
 async function updateComment(req, res) {
-    try {
-        const { id } = req.params;
-        const { content } = req.body;
-        const comment = await commentModel.findByIdAndUpdate(
-            id,
-            { content, date: Date.now() }, // Tùy chọn: cập nhật date nếu cần
-            { new: true }
-        );
-        if (!comment) {
-            return res.status(404).json({ message: "Comment not found" });
-        }
-        res.status(200).json({ message: "Comment updated successfully", comment });
-    } catch (error) {
-        console.error("Error updating comment:", error);
-        res.status(500).json({ message: "Error updating comment", error });
+  try {
+    const { id } = req.params;
+    const { content, rating } = req.body;
+
+    // Khởi tạo đối tượng cập nhật, luôn cập nhật ngày
+    const updateData = {
+      date: new Date()
+    };
+
+    // Nếu có content, kiểm tra tính hợp lệ và thêm vào đối tượng cập nhật
+    if (content !== undefined) {
+      if (typeof content !== 'string' || !content.trim()) {
+        return res.status(400).json({ message: "Nội dung comment không hợp lệ" });
+      }
+      updateData.content = content;
     }
-};
+
+    // Nếu có rating được gửi lên, kiểm tra tính hợp lệ (ví dụ: số, trong khoảng 0 đến 5)
+    if (rating !== undefined) {
+      if (typeof rating !== 'number' || isNaN(rating) || rating < 0 || rating > 5) {
+        return res.status(400).json({ message: "Rating phải là số hợp lệ trong khoảng từ 0 đến 5" });
+      }
+      updateData.rating = rating;
+    }
+
+    // Nếu không có trường nào được cập nhật (tức cả content và rating đều không có)
+    if (!updateData.content && updateData.rating === undefined) {
+      return res.status(400).json({ message: "Không có thông tin cập nhật được cung cấp" });
+    }
+
+    // Cập nhật comment theo id
+    const updatedComment = await Comment.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    // Nếu không tìm thấy comment
+    if (!updatedComment) {
+      return res.status(404).json({ message: "Comment không tồn tại" });
+    }
+
+    res.status(200).json({
+      message: "Comment được cập nhật thành công",
+      comment: updatedComment
+    });
+  } catch (error) {
+    console.error("Lỗi cập nhật comment:", error);
+    res.status(500).json({ message: "Có lỗi xảy ra khi cập nhật comment", error: error.message });
+  }
+}
+
 
 // async function to delete a comment from the database
 async function deleteComment(req, res) {

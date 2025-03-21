@@ -5,6 +5,7 @@ const objectId = Schema.ObjectId;
 const commentSchema = new Schema({
     userId : {type: Schema.Types.ObjectId, ref: 'users'},
     productId : {type: Schema.Types.ObjectId, ref: 'product'},
+    rating: { type: Number, required: true },
     content: { type: String, required: true },
     date: { type: Date, required: true },
     status: {type: String, default: 'pending' },
