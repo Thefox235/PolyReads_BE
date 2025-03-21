@@ -42,7 +42,7 @@ module.exports = {
     updateOrder, createOrder, getOrderById, getOrders, deleteAddress,
     updateAddress, createAddress, getAddressById, getAllAddresses,
     getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId,
-    likeComment, unlikeComment
+    likeComment, unlikeComment, toggleLike
 }
 
 //
@@ -498,6 +498,47 @@ async function createComment(req, res) {
         res.status(500).json({ message: "Error creating comment", error });
     }
 };
+//kiểm tra người dùng like hay chưa
+async function toggleLike(req, res) {
+    try {
+      const { id } = req.params;
+      const { userId } = req.body;
+  
+      // Kiểm tra userId có được gửi lên không
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required for toggling like" });
+      }
+  
+      // Lấy comment theo id
+      const comment = await commentModel.findById(id);
+      if (!comment) {
+        return res.status(404).json({ message: "Comment không tồn tại" });
+      }
+  
+      // Kiểm tra xem user đã like comment hay chưa
+      if (comment.likedBy.includes(userId)) {
+        // Nếu đã like -> hủy like: xóa userId khỏi likedBy
+        comment.likedBy.pull(userId);
+      } else {
+        // Nếu chưa like -> thực hiện like: thêm userId vào likedBy
+        comment.likedBy.push(userId);
+      }
+  
+      // Cập nhật lại số lượt like dựa trên độ dài của mảng likedBy
+      comment.likes = comment.likedBy.length;
+  
+      await comment.save();
+  
+      res.status(200).json({
+        message: comment.likedBy.includes(userId) ? "Comment đã được like" : "Đã hủy like comment",
+        comment
+      });
+  
+    } catch (error) {
+      console.error("Lỗi khi toggle like:", error);
+      res.status(500).json({ message: "Có lỗi xảy ra khi xử lý like", error: error.message });
+    }
+  }
 //lấy comment
 async function getComments(req, res) {
     try {

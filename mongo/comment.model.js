@@ -9,6 +9,7 @@ const commentSchema = new Schema({
   date: { type: Date, default: Date.now },
   status: { type: String, default: 'pending' },
   likes: { type: Number, default: 0 },
+  likedBy: [{ type: Schema.Types.ObjectId, ref: 'users' }], // Lưu danh sách các user đã like
 });
 
 module.exports =

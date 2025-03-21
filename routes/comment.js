@@ -20,4 +20,7 @@ router.put('/:id/like', commentController.likeComment);
 // Endpoint để unlike comment: giảm số lượt like (-1)
 router.put('/:id/unlike', commentController.unlikeComment);
 
+// Endpoint để toggle like (like nếu chưa like, hủy like nếu đã like)
+router.put('/:id/toggle-like', commentController.toggleLike);
+
 module.exports = router;
