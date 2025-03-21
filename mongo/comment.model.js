@@ -1,14 +1,15 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
-const objectId = Schema.ObjectId;
- 
+
 const commentSchema = new Schema({
-    userId : {type: Schema.Types.ObjectId, ref: 'users'},
-    productId : {type: Schema.Types.ObjectId, ref: 'product'},
-    rating: { type: Number, required: true },
-    content: { type: String, required: true },
-    date: { type: Date, required: true },
-    status: {type: String, default: 'pending' },
-  });
-  
-module.exports = mongoose.models.commentSchema || mongoose.model('comment', commentSchema);
+  userId: { type: Schema.Types.ObjectId, ref: 'users', required: true },
+  productId: { type: Schema.Types.ObjectId, ref: 'product', required: true },
+  rating: { type: Number, required: true },
+  content: { type: String, required: true },
+  date: { type: Date, default: Date.now },
+  status: { type: String, default: 'pending' },
+  likes: { type: Number, default: 0 },
+});
+
+module.exports =
+  mongoose.models.comment || mongoose.model('comment', commentSchema);
