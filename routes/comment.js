@@ -14,4 +14,10 @@ router.put('/:id', commentController.updateComment);
 // Xóa comment
 router.delete('/:id', commentController.deleteComment);
 
+// Endpoint để like comment: tăng số lượt like (+1)
+router.put('/:id/like', commentController.likeComment);
+
+// Endpoint để unlike comment: giảm số lượt like (-1)
+router.put('/:id/unlike', commentController.unlikeComment);
+
 module.exports = router;

@@ -41,7 +41,8 @@ module.exports = {
     createVNPayPaymentIntent, createMomoPaymentIntent, deleteOrder,
     updateOrder, createOrder, getOrderById, getOrders, deleteAddress,
     updateAddress, createAddress, getAddressById, getAllAddresses,
-    getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId
+    getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId,
+    likeComment, unlikeComment
 }
 
 //
@@ -513,6 +514,57 @@ async function getComments(req, res) {
         res.status(500).json({ message: "Error fetching comments", error });
     }
 };
+//unlike comment
+async function unlikeComment(req, res) {
+    try {
+      const { id } = req.params;
+  
+      // Cập nhật giảm 1 của trường likes chỉ khi likes hiện tại > 0
+      const updatedComment = await commentModel.findOneAndUpdate(
+        { _id: id, likes: { $gt: 0 } }, // chỉ update nếu likes > 0
+        { $inc: { likes: -1 } },
+        { new: true }
+      );
+  
+      if (!updatedComment) {
+        return res.status(404).json({ message: "Comment không tồn tại hoặc chưa có lượt like để hủy" });
+      }
+  
+      res.status(200).json({
+        message: "Đã hủy like comment",
+        comment: updatedComment
+      });
+    } catch (error) {
+      console.error("Lỗi khi hủy like comment:", error);
+      res.status(500).json({
+        message: "Có lỗi xảy ra khi hủy like comment",
+        error: error.message
+      });
+    }
+  }
+//like comment
+async function likeComment(req, res) {
+    try {
+      const { id } = req.params;
+      const updatedComment = await commentModel.findByIdAndUpdate(
+        id,
+        { $inc: { likes: 1 } },
+        { new: true }
+      );
+  
+      if (!updatedComment) {
+        return res.status(404).json({ message: "Comment không tồn tại" });
+      }
+  
+      res.status(200).json({
+        message: "Comment đã được like",
+        comment: updatedComment
+      });
+    } catch (error) {
+      console.error("Lỗi khi like comment:", error);
+      res.status(500).json({ message: "Có lỗi xảy ra khi like comment", error: error.message });
+    }
+  }
 //sửa comment
 
 async function updateComment(req, res) {
