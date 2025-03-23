@@ -19,9 +19,12 @@ const googleClient = new OAuth2Client(CLIENT_ID);
 const paymentModel = require('./payment.model');
 const addressModel = require('./address.model');
 const OrderDetail = require('./order_detail.model');
+const postModel = require('./post.model');
 const crypto = require('crypto');
 const querystring = require('querystring');
 const axios = require('axios');
+const slugify = require('slugify');
+
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
@@ -42,10 +45,116 @@ module.exports = {
     updateOrder, createOrder, getOrderById, getOrders, deleteAddress,
     updateAddress, createAddress, getAddressById, getAllAddresses,
     getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId,
-    likeComment, unlikeComment, toggleLike
+    likeComment, unlikeComment, toggleLike, createPost, getPosts,
+    getPostBySlug, updatePost, deletePost
+
+}
+//
+
+// Tạo mới bài viết từ dữ liệu gửi lên từ Toast Editor
+async function createPost(req, res) {
+  try {
+    const { title, content, tag, coverImage } = req.body;
+
+    // Tạo slug dựa trên tiêu đề
+    const slug = slugify(title, { lower: true, strict: true });
+
+    const newPost = new postModel({
+      title,
+      content,  // Nội dung HTML hoặc Markdown từ Toast Editor
+      tag,
+      coverImage,
+      slug
+    });
+
+    await newPost.save();
+
+    return res.status(201).json({
+      message: "Bài viết được tạo thành công",
+      post: newPost
+    });
+  } catch (error) {
+    console.error("Lỗi khi tạo bài viết:", error);
+    res.status(500).json({ message: "Lỗi khi tạo bài viết", error: error.message });
+  }
 }
 
-//
+// Lấy danh sách bài viết
+async function getPosts(req, res) {
+  try {
+    // Có thể bổ sung phân trang hoặc filter theo tag
+    const posts = await postModel.find().sort({ createdAt: -1 });
+    return res.status(200).json({ posts });
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách bài viết:", error);
+    res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết", error: error.message });
+  }
+}
+
+// Lấy bài viết theo slug (cho URL thân thiện)
+async function getPostBySlug(req, res) {
+  try {
+    const { slug } = req.params;
+    const post = await postModel.findOne({ slug });
+    if (!post) {
+      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+    }
+    return res.status(200).json({ post });
+  } catch (error) {
+    console.error("Lỗi khi lấy bài viết:", error);
+    res.status(500).json({ message: "Lỗi khi lấy bài viết", error: error.message });
+  }
+}
+
+// Cập nhật bài viết
+async function updatePost(req, res) {
+  try {
+    const { id } = req.params;
+    const { title, content, tag, coverImage } = req.body;
+
+    const updateData = { updatedAt: new Date() };
+
+    if (title) {
+      updateData.title = title;
+      updateData.slug = slugify(title, { lower: true, strict: true });
+    }
+    if (content) {
+      updateData.content = content;
+    }
+    if (tag) {
+      updateData.tag = tag;
+    }
+    if (coverImage) {
+      updateData.coverImage = coverImage;
+    }
+
+    const updatedPost = await postModel.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+    if (!updatedPost) {
+      return res.status(404).json({ message: "Bài viết không tồn tại" });
+    }
+
+    return res.status(200).json({ message: "Bài viết được cập nhật thành công", post: updatedPost });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật bài viết:", error);
+    res.status(500).json({ message: "Lỗi khi cập nhật bài viết", error: error.message });
+  }
+}
+
+// Xóa bài viết
+async function deletePost(req, res) {
+  try {
+    const { id } = req.params;
+    const deletedPost = await postModelfindByIdAndDelete(id);
+    if (!deletedPost) {
+      return res.status(404).json({ message: "Bài viết không tồn tại" });
+    }
+    return res.status(200).json({ message: "Bài viết đã được xóa thành công" });
+  } catch (error) {
+    console.error("Lỗi khi xóa bài viết:", error);
+    res.status(500).json({ message: "Lỗi khi xóa bài viết", error: error.message });
+  }
+}
+
 // Hàm lấy đơn hàng theo userId (ví dụ sử dụng query parameter)
 async function getOrdersByUserId(req, res) {
     try {

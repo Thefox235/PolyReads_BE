@@ -1,37 +1,37 @@
+// models/Post.js
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const postSchema = new Schema({
   title: {
     type: String,
-    required: true
+    required: true,
   },
   slug: {
     type: String,
     required: true,
-    unique: true // để dễ dàng tạo URL thân thiện
+    unique: true, // Để tạo URL thân thiện
   },
-  // Field content lưu trữ HTML hoặc Markdown được tạo bởi trình soạn thảo WYSIWYG
-  content: { 
-    type: String,  
-    required: true
+  // Nội dung được soạn từ Toast Editor: HTML hoặc Markdown
+  content: {
+    type: String,
+    required: true,
   },
-  // Các trường khác nếu cần
-  tag: { 
-    type: Schema.Types.ObjectId, 
-    ref: "category", 
-    required: true 
+  tag: {
+    type: Schema.Types.ObjectId,
+    ref: "category",
+    required: true,
   },
   coverImage: {
-    type: String // URL của hình ảnh bìa (nếu có)
+    type: String, // URL của hình ảnh bìa (nếu có)
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   }
 });
 
