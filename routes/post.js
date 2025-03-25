@@ -9,6 +9,9 @@ router.post('/', postController.createPost);
 // Lấy danh sách bài viết
 router.get('/', postController.getPosts);
 
+// Lấy chi tiết bài viết
+router.get('/:id', postController.getPostById);
+
 // Lấy bài viết theo slug (URL thân thiện)
 router.get('/:slug', postController.getPostBySlug);
 

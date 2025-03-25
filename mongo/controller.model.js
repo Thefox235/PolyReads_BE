@@ -46,11 +46,30 @@ module.exports = {
     updateAddress, createAddress, getAddressById, getAllAddresses,
     getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId,
     likeComment, unlikeComment, toggleLike, createPost, getPosts,
-    getPostBySlug, updatePost, deletePost
+    getPostBySlug, updatePost, deletePost, getPostById
 
 }
 //
-
+//lấy post theo id
+// async function to get a post by its id
+async function getPostById(req, res) {
+    try {
+        // get the id from the request parameters
+        const { id } = req.params;
+        // find the post by its id
+        const post = await postModel.findById(id);
+        // if the post is not found, return a 404 status code with a message
+        if (!post) {
+            return res.status(404).json({ message: "Không tìm thấy bài viết" });
+        }
+        // if the post is found, return a 200 status code with the post
+        return res.status(200).json({ post });
+    } catch (error) {
+        // if there is an error, log it to the console and return a 500 status code with a message and the error
+        console.error("Lỗi khi lấy bài viết:", error);
+        res.status(500).json({ message: "Lỗi khi lấy bài viết", error: error.message });
+    }
+}
 // Tạo mới bài viết từ dữ liệu gửi lên từ Toast Editor
 async function createPost(req, res) {
   try {
