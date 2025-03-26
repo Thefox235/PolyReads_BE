@@ -3,6 +3,7 @@ const userModel = require('../mongo/user.model.js');
 var router = express.Router();
 userController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
+const authorizeRole = require("../hepler/authorizeRole");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 
 router.get('/',async (req,res)=>{
     try {
@@ -38,13 +39,15 @@ router.post('/verify-otp', async (req, res) => {
 // Endpoint gửi lại OTP
 router.post('/resend-otp', userController.resendOtp);
  // Router để đổi mật khẩu
-router.post('/changepass',checktoken, async (req, res) => {
-  const { email, oldPassword, newPassword } = req.body;
+ router.post('/changepass', checktoken, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  // Lấy thông tin user từ token (được gán bởi middleware checktoken)
+  const email = req.user.email; 
   try {
-      const result = await userController.changePassword(email, oldPassword, newPassword);
-      res.status(200).json({ message: 'Mật khẩu đã được thay đổi thành công', result });
+    const result = await userController.changePassword(email, oldPassword, newPassword);
+    res.status(200).json({ message: 'Mật khẩu đã được thay đổi thành công', result });
   } catch (error) {
-      res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 

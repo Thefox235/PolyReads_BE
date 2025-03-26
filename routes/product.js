@@ -2,7 +2,9 @@ var express = require('express');
 const productModel = require('../mongo/product.model.js');
 var router = express.Router();
 productController = require('../mongo/controller.model.js')
-const checktoken = require('../hepler/checktoken.js')
+const checktoken = require('../hepler/checktoken.js');
+const authorizeRole = require("../hepler/authorizeRole");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
+
 /* GET users listing. */
 
 router.put('/apply-discount', async (req, res) => {
@@ -38,7 +40,7 @@ router.post('/addpro', async (req, res)=> {
   }
 });
 //thêm sản phẩm localhost:3000/product/add
-router.post('/add', async (req, res) => {
+router.post('/add', checktoken, authorizeRole("1"),  async (req, res) => {
   try {
     // {
     //    productData: { name: "...", price: ... },
@@ -124,7 +126,7 @@ router.get('/:key/:value',async (req,res)=>{
 })
 
 // update sản phẩm (với cả cập nhật hình ảnh)
-router.put('/:id', async (req, res) => {
+router.put('/:id', checktoken, authorizeRole("1"),  async (req, res) => {
   try {
     const { id } = req.params;
     // Destructure body nhận được: phải có key productData và images
@@ -139,7 +141,7 @@ router.put('/:id', async (req, res) => {
 });
 
 //xoa san pham theo id
-router.delete('/delete/:id', async (req, res) => {
+router.delete('/delete/:id', checktoken, authorizeRole("1"), async (req, res) => {
   try {
     const { id } = req.params;
     const prodel = await productController.deleteById(id);

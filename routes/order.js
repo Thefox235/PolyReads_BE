@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../mongo/controller.model');
-
+const checktoken = require('../hepler/checktoken.js');
+const authorizeRole = require("../hepler/authorizeRole");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 // Lấy tất cả đơn hàng
 router.get('/', orderController.getOrders);
 

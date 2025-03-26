@@ -1398,13 +1398,13 @@ async function changePassword(email, oldPassword, newPassword) {
             throw new Error("Người dùng không tồn tại");
         }
         // Kiểm tra mật khẩu cũ
-        const validPassword = bcrypt.compareSync(oldPassword, user.pass);
+        const validPassword = await bcrypt.compare(oldPassword, user.pass);
         if (!validPassword) {
             throw new Error("Mật khẩu cũ không chính xác");
         }
         // Tạo hash cho mật khẩu mới
         var salt = bcrypt.genSaltSync(10);
-        var hash = bcrypt.hashSync(newPassword, salt);
+        const hash = await bcrypt.hash(newPassword, 10);
         // Cập nhật mật khẩu mới
         user.pass = hash;
         const result = await user.save();

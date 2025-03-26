@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const bannerController = require('../mongo/controller.model.js');
 const bannerModel = require('../mongo/banner.model.js');
+const checktoken = require('../hepler/checktoken.js');
+const authorizeRole = require("../hepler/authorizeRole");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 // Lấy danh sách banner
 router.get('/', async (req, res) => {
     try {

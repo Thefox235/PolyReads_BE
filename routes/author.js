@@ -3,6 +3,7 @@ var router = express.Router();
 const authorController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
 const authorModel = require('../mongo/author.model.js');
+const authorizeRole = require("../hepler/authorizeRole");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 
 router.get('/',async (req,res)=>{
     try {

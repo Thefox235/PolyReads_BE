@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../mongo/product.model.js');
-
+const checktoken = require('../hepler/checktoken.js');
+const authorizeRole = require("../hepler/authorizeRole");
 /**
  * API endpoint: Áp dụng discount cho tất cả các sản phẩm (hoặc theo filter nhất định).
  * 
