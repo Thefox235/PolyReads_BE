@@ -466,50 +466,65 @@ async function createMomoPaymentIntent(req, res) {
 //thánh toán vn pay
 async function createVNPayPaymentIntent(req, res) {
     try {
-        // Ví dụ: lấy thông tin đơn hàng từ request
-        const { orderId, amount, orderInfo } = req.body;
-        // VNPay yêu cầu số tiền tính theo đơn vị nhỏ nhất (nếu VND thì nhân 100)
-        const vnp_Amount = amount * 100;
-        // Các tham số cần gửi tới VNPay
-        let vnp_Params = {
-            vnp_Version: '2.0.0',
-            vnp_Command: 'pay',
-            vnp_TmnCode: process.env.VNP_TMN_CODE,
-            vnp_Amount: vnp_Amount,
-            vnp_CurrCode: 'VND',
-            vnp_TxnRef: orderId, // mã đơn hàng duy nhất
-            vnp_OrderInfo: orderInfo || 'Thanh toán đơn hàng',
-            vnp_OrderType: 'other', // loại đơn, có thể tuỳ chỉnh theo nghiệp vụ
-            vnp_Locale: 'vn',
-            vnp_ReturnUrl: process.env.VNP_RETURN_URL,
-            vnp_IpAddr: req.ip,
-            vnp_CreateDate: new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14) // Format: YYYYMMDDHHMMSS
-        };
-
-        // Sắp xếp các tham số theo thứ tự từ điển
-        vnp_Params = sortObject(vnp_Params);
-
-        // Tạo chuỗi query (không mã hóa giá trị) để ký số
-        const signData = querystring.stringify(vnp_Params, null, null, {
-            encodeURIComponent: (str) => str
-        });
-        // Tạo secure hash bằng HMAC SHA512
-        const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
-        const secureHash = hmac.update(signData).digest("hex");
-
-        // Thêm secureHash vào tham số
-        vnp_Params.vnp_SecureHash = secureHash;
-
-        // Tạo URL thanh toán VNPay
-        const paymentUrl = `${process.env.VNP_PAY_URL}?${querystring.stringify(vnp_Params)}`;
-
-        return res.status(200).json({ paymentUrl });
+      const { orderId, amount, orderInfo } = req.body;
+      // Gọi các biến môi trường từ .env thông qua process.env
+      const vnp_TmnCode = process.env.VNP_TMN_CODE;
+      const vnp_HashSecret = process.env.VNP_HASH_SECRET;
+      const vnp_PayUrl = process.env.VNP_PAY_URL;
+      const vnp_ReturnUrl = process.env.VNP_RETURN_URL;
+  
+      // Nếu VNPay yêu cầu số tiền nhỏ nhất:
+      const vnp_Amount = amount * 100;
+  
+      // Xây dựng các tham số cần gửi tới VNPay
+      let vnp_Params = {
+        vnp_Version: "2.0.0",
+        vnp_Command: "pay",
+        vnp_TmnCode: vnp_TmnCode,
+        vnp_Amount: vnp_Amount,
+        vnp_CurrCode: "VND",
+        vnp_TxnRef: orderId, // Mã đơn hàng duy nhất
+        vnp_OrderInfo: orderInfo || "Thanh toán đơn hàng",
+        vnp_OrderType: "other",
+        vnp_Locale: "vn",
+        vnp_ReturnUrl: vnp_ReturnUrl,
+        vnp_IpAddr: req.ip,
+        vnp_CreateDate: new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14)
+      };
+  
+      // Sắp xếp các tham số theo thứ tự từ điển
+      vnp_Params = sortObject(vnp_Params);
+  
+      // Tạo chuỗi query để ký số
+      const signData = querystring.stringify(vnp_Params, null, null, {
+        encodeURIComponent: (str) => str
+      });
+      // Tạo secure hash bằng HMAC SHA512
+      const hmac = crypto.createHmac("sha512", vnp_HashSecret);
+      const secureHash = hmac.update(signData).digest("hex");
+  
+      // Thêm secure hash vào tham số
+      vnp_Params.vnp_SecureHash = secureHash;
+      
+      // Tạo URL thanh toán
+      const paymentUrl = `${vnp_PayUrl}?${querystring.stringify(vnp_Params)}`;
+  
+      return res.status(200).json({ paymentUrl });
     } catch (error) {
-        console.error("Lỗi tạo Payment VNPay:", error);
-        return res.status(500).json({ message: error.message });
+      console.error("Lỗi tạo Payment VNPay:", error);
+      return res.status(500).json({ message: error.message });
     }
-}
-
+  }
+  
+  // Hàm sortObject (nếu cần)
+  function sortObject(obj) {
+    const keys = Object.keys(obj).sort();
+    const sortedObj = {};
+    keys.forEach(key => {
+      sortedObj[key] = obj[key];
+    });
+    return sortedObj;
+  }
 // Hàm sắp xếp object theo key (theo thứ tự từ điển)
 function sortObject(obj) {
     let sorted = {};
