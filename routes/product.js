@@ -114,16 +114,22 @@ router.get('/page', async (req, res) => {
 
 //tìm kiếm
 //localhost:3000/product/key/value
-router.get('/:key/:value',async (req,res)=>{
+// routes/product.routes.js
+// API tìm kiếm sản phẩm theo query parameters: field và keyword
+router.get('/search', async (req, res) => {
   try {
-    const {key, value} = req.params;
-    const pro = await productController.getByKey(key,value)
-    return res.status(200).json({Products: pro})
+    const { field, keyword } = req.query;
+    if (!field || !keyword) {
+      return res.status(400).json({ message: "Missing 'field' or 'keyword' query parameter" });
+    }
+    const products = await productController.getByKey(field, keyword);
+    return res.status(200).json({ products });
   } catch (error) {
-    console.log('lỗi get by key: ',error);
-    return res.status(500).json({mess: error});
+    console.error("Error in product search:", error);
+    return res.status(500).json({ message: error.message });
   }
-})
+});
+
 
 // update sản phẩm (với cả cập nhật hình ảnh)
 router.put('/:id', checktoken, authorizeRole("1"),  async (req, res) => {

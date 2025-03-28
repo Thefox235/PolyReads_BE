@@ -2086,30 +2086,27 @@ async function getNewPro() {
         throw error;
     }
 }
-
 async function getByKey(key, value) {
     try {
-        // Sử dụng biểu thức chính quy để tìm kiếm tương đối
-        let regex = new RegExp(value, 'i'); // 'i' là cờ không phân biệt hoa thường
-
-        // Sử dụng phương thức find thay vì findOne để lấy tất cả các kết quả phù hợp
-        let results = await productModel.find({ [key]: regex }, 'name price quantity images');
-
-        // Chuyển đổi kết quả thành định dạng mong muốn
-        results = results.map(result => ({
-            Masp: result._id,
-            Ten: result.name,
-            Gia: result.price,
-            SoLuong: result.stock,
-            Hinh: result.images
-        }));
-
-        return results;
+      // Tạo regex để chỉ khớp với các chuỗi bắt đầu bằng 'value'
+      const regex = new RegExp('^' + value, 'i');
+  
+      // Tìm kiếm sản phẩm với điều kiện khớp prefix
+      let results = await productModel.find({ [key]: regex }, 'name price stock');
+  
+      // Mapping kết quả theo định dạng mong muốn
+      results = results.map(result => ({
+        Masp: result._id,
+        Ten: result.name,
+        Gia: result.price,
+        SoLuong: result.stock
+      }));
+  
+      return results;
     } catch (error) {
-        console.log('lỗi get prodcut by key: ', error);
+      console.error('Lỗi get product by key:', error);
     }
-}
-
+  }
 async function updateCateById(id, body) {
     try {
         const pro = await categoryModel.findById(id);
