@@ -20,10 +20,15 @@ const paymentModel = require('./payment.model');
 const addressModel = require('./address.model');
 const OrderDetail = require('./order_detail.model');
 const postModel = require('./post.model');
+const favoriteModel = require("./favorite.model");
 const crypto = require('crypto');
 const querystring = require('querystring');
 const axios = require('axios');
 const slugify = require('slugify');
+const { log } = require('console')
+require('dotenv').config();
+const qs = require("qs");
+const moment = require("moment");
 
 module.exports = {
     insert, getAll, updateById,
@@ -46,10 +51,134 @@ module.exports = {
     updateAddress, createAddress, getAddressById, getAllAddresses,
     getOrderDetailsByOrderId, createOrderDetail, getOrdersByUserId,
     likeComment, unlikeComment, toggleLike, createPost, getPosts,
-    getPostBySlug, updatePost, deletePost, getPostById
+    getPostBySlug, updatePost, deletePost, getPostById, confirmPayment,
+    createFavorite, getFavoritesByUser, getFavoriteById, deleteFavorite,
+    getAllFavorites
 
 }
+// controllers/favorite.controller.js
+async function getAllFavorites(req, res) {
+    try {
+      const favorites = await favoriteModel.find({})
+        .populate("productId")
+        .populate("userId");
+      return res.status(200).json({ favorites });
+    } catch (error) {
+      console.error("Lỗi khi lấy tất cả favorite:", error);
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+async function createFavorite(req, res) {
+  try {
+    const { userId, productId } = req.body;
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "userId và productId là bắt buộc." });
+    }
+
+    // Kiểm tra xem favorite đã tồn tại chưa để tránh trùng lặp
+    const existingFavorite = await favoriteModel.findOne({ userId, productId });
+    if (existingFavorite) {
+      return res.status(400).json({ message: "Favorite đã tồn tại." });
+    }
+
+    const favorite = await favoriteModel.create({ userId, productId });
+    return res.status(201).json({
+      message: "Favorite được tạo thành công",
+      favorite
+    });
+  } catch (error) {
+    console.error("Lỗi tạo favorite:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+async function getFavoritesByUser(req, res) {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ message: "userId là bắt buộc." });
+    }
+
+    // Populated nếu cần thông tin chi tiết về sản phẩm và người dùng
+    const favorites = await favoriteModel.find({ userId })
+      .populate("productId")
+      .populate("userId");
+    return res.status(200).json({ favorites });
+  } catch (error) {
+    console.error("Lỗi lấy favorites cho user:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+async function getFavoriteById(req, res) {
+  try {
+    const { id } = req.params;
+    const favorite = await favoriteModel.findById(id)
+      .populate("productId")
+      .populate("userId");
+    if (!favorite) {
+      return res.status(404).json({ message: "Favorite không tồn tại." });
+    }
+    return res.status(200).json({ favorite });
+  } catch (error) {
+    console.error("Lỗi lấy favorite theo id:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+async function deleteFavorite(req, res) {
+  try {
+    const { id } = req.params;
+    const favorite = await favoriteModel.findByIdAndDelete(id);
+    if (!favorite) {
+      return res.status(404).json({ message: "Favorite không tồn tại." });
+    }
+    return res.status(200).json({ message: "Favorite đã được xóa thành công." });
+  } catch (error) {
+    console.error("Lỗi xóa favorite:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
 //
+async function confirmPayment (req, res, next) {
+    try {
+      // Lấy các thông số cần thiết từ body
+      const { orderId, paymentId, vnp_ResponseCode } = req.body;
+  
+      // Xác định trạng thái thanh toán mới dựa vào vnp_ResponseCode ("00" => success)
+      const newPaymentStatus = vnp_ResponseCode === '00' ? 'success' : 'failed';
+  
+      // Cập nhật Payment theo paymentId
+      const updatedPayment = await paymentModel.findByIdAndUpdate(
+        paymentId,
+        { status: newPaymentStatus },
+        { new: true }
+      );
+  
+      // Quy ước: payment_status của Order
+      // 0: pending, 1: success, 2: failed
+      const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
+  
+      // Cập nhật Order theo orderId (và lưu luôn paymentId vào field order.paymentId)
+      const updatedOrder = await orderModel.findByIdAndUpdate(
+        orderId,
+        { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
+        { new: true }
+      );
+  
+      return res.status(200).json({
+        message: "Cập nhật trạng thái thanh toán thành công",
+        payment: updatedPayment,
+        order: updatedOrder,
+      });
+    } catch (error) {
+      console.error("Lỗi cập nhật trạng thái thanh toán:", error);
+      return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
+    }
+  };
+    
 //lấy post theo id
 // async function to get a post by its id
 async function getPostById(req, res) {
@@ -72,165 +201,165 @@ async function getPostById(req, res) {
 }
 // Tạo mới bài viết từ dữ liệu gửi lên từ Toast Editor
 async function createPost(req, res) {
-  try {
-    const { title, content, tag, coverImage } = req.body;
+    try {
+        const { title, content, tag, coverImage } = req.body;
 
-    // Tạo slug dựa trên tiêu đề
-    const slug = slugify(title, { lower: true, strict: true });
+        // Tạo slug dựa trên tiêu đề
+        const slug = slugify(title, { lower: true, strict: true });
 
-    const newPost = new postModel({
-      title,
-      content,  // Nội dung HTML hoặc Markdown từ Toast Editor
-      tag,
-      coverImage,
-      slug
-    });
+        const newPost = new postModel({
+            title,
+            content,  // Nội dung HTML hoặc Markdown từ Toast Editor
+            tag,
+            coverImage,
+            slug
+        });
 
-    await newPost.save();
+        await newPost.save();
 
-    return res.status(201).json({
-      message: "Bài viết được tạo thành công",
-      post: newPost
-    });
-  } catch (error) {
-    console.error("Lỗi khi tạo bài viết:", error);
-    res.status(500).json({ message: "Lỗi khi tạo bài viết", error: error.message });
-  }
+        return res.status(201).json({
+            message: "Bài viết được tạo thành công",
+            post: newPost
+        });
+    } catch (error) {
+        console.error("Lỗi khi tạo bài viết:", error);
+        res.status(500).json({ message: "Lỗi khi tạo bài viết", error: error.message });
+    }
 }
 
 // Lấy danh sách bài viết
 async function getPosts(req, res) {
-  try {
-    // Có thể bổ sung phân trang hoặc filter theo tag
-    const posts = await postModel.find().sort({ createdAt: -1 });
-    return res.status(200).json({ posts });
-  } catch (error) {
-    console.error("Lỗi khi lấy danh sách bài viết:", error);
-    res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết", error: error.message });
-  }
+    try {
+        // Có thể bổ sung phân trang hoặc filter theo tag
+        const posts = await postModel.find().sort({ createdAt: -1 });
+        return res.status(200).json({ posts });
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách bài viết:", error);
+        res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết", error: error.message });
+    }
 }
 
 // Lấy bài viết theo slug (cho URL thân thiện)
 async function getPostBySlug(req, res) {
-  try {
-    const { slug } = req.params;
-    const post = await postModel.findOne({ slug });
-    if (!post) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+    try {
+        const { slug } = req.params;
+        const post = await postModel.findOne({ slug });
+        if (!post) {
+            return res.status(404).json({ message: "Không tìm thấy bài viết" });
+        }
+        return res.status(200).json({ post });
+    } catch (error) {
+        console.error("Lỗi khi lấy bài viết:", error);
+        res.status(500).json({ message: "Lỗi khi lấy bài viết", error: error.message });
     }
-    return res.status(200).json({ post });
-  } catch (error) {
-    console.error("Lỗi khi lấy bài viết:", error);
-    res.status(500).json({ message: "Lỗi khi lấy bài viết", error: error.message });
-  }
 }
 
 // Cập nhật bài viết
 async function updatePost(req, res) {
-  try {
-    const { id } = req.params;
-    const { title, content, tag, coverImage } = req.body;
+    try {
+        const { id } = req.params;
+        const { title, content, tag, coverImage } = req.body;
 
-    const updateData = { updatedAt: new Date() };
+        const updateData = { updatedAt: new Date() };
 
-    if (title) {
-      updateData.title = title;
-      updateData.slug = slugify(title, { lower: true, strict: true });
-    }
-    if (content) {
-      updateData.content = content;
-    }
-    if (tag) {
-      updateData.tag = tag;
-    }
-    if (coverImage) {
-      updateData.coverImage = coverImage;
-    }
+        if (title) {
+            updateData.title = title;
+            updateData.slug = slugify(title, { lower: true, strict: true });
+        }
+        if (content) {
+            updateData.content = content;
+        }
+        if (tag) {
+            updateData.tag = tag;
+        }
+        if (coverImage) {
+            updateData.coverImage = coverImage;
+        }
 
-    const updatedPost = await postModel.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
-    if (!updatedPost) {
-      return res.status(404).json({ message: "Bài viết không tồn tại" });
-    }
+        const updatedPost = await postModel.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+        if (!updatedPost) {
+            return res.status(404).json({ message: "Bài viết không tồn tại" });
+        }
 
-    return res.status(200).json({ message: "Bài viết được cập nhật thành công", post: updatedPost });
-  } catch (error) {
-    console.error("Lỗi khi cập nhật bài viết:", error);
-    res.status(500).json({ message: "Lỗi khi cập nhật bài viết", error: error.message });
-  }
+        return res.status(200).json({ message: "Bài viết được cập nhật thành công", post: updatedPost });
+    } catch (error) {
+        console.error("Lỗi khi cập nhật bài viết:", error);
+        res.status(500).json({ message: "Lỗi khi cập nhật bài viết", error: error.message });
+    }
 }
 
 // Xóa bài viết
 async function deletePost(req, res) {
-  try {
-    const { id } = req.params;
-    const deletedPost = await postModel.findByIdAndDelete(id);
-    if (!deletedPost) {
-      return res.status(404).json({ message: "Bài viết không tồn tại" });
+    try {
+        const { id } = req.params;
+        const deletedPost = await postModel.findByIdAndDelete(id);
+        if (!deletedPost) {
+            return res.status(404).json({ message: "Bài viết không tồn tại" });
+        }
+        return res.status(200).json({ message: "Bài viết đã được xóa thành công" });
+    } catch (error) {
+        console.error("Lỗi khi xóa bài viết:", error);
+        res.status(500).json({ message: "Lỗi khi xóa bài viết", error: error.message });
     }
-    return res.status(200).json({ message: "Bài viết đã được xóa thành công" });
-  } catch (error) {
-    console.error("Lỗi khi xóa bài viết:", error);
-    res.status(500).json({ message: "Lỗi khi xóa bài viết", error: error.message });
-  }
 }
 
 // Hàm lấy đơn hàng theo userId (ví dụ sử dụng query parameter)
 async function getOrdersByUserId(req, res) {
     try {
-      const userId = req.params.id;
-      if (!userId) {
-        return res.status(400).json({ message: "Missing userId" });
-      }
-      // Nếu userId ở database là ObjectId, bạn có thể ép chúng về chuỗi để so sánh
-      const orders = await orderModel.find({ userId: userId })
-        .populate('userId')
-        .populate('paymentId')
-        .populate('addressId');
-      res.status(200).json({ orders });
+        const userId = req.params.id;
+        if (!userId) {
+            return res.status(400).json({ message: "Missing userId" });
+        }
+        // Nếu userId ở database là ObjectId, bạn có thể ép chúng về chuỗi để so sánh
+        const orders = await orderModel.find({ userId: userId })
+            .populate('userId')
+            .populate('paymentId')
+            .populate('addressId');
+        res.status(200).json({ orders });
     } catch (error) {
-      console.error("Lỗi lấy đơn hàng theo userId:", error);
-      res.status(500).json({ message: error.message });
+        console.error("Lỗi lấy đơn hàng theo userId:", error);
+        res.status(500).json({ message: error.message });
     }
-  }
-  
+}
+
 // Tạo Order Detail mới (tạo nhiều record cho một order)
 async function createOrderDetail(req, res) {
     try {
-      const { orderId, items } = req.body;
-      console.log("Payload Order Detail:", req.body); // Log payload nhận được
-      if (!items || !Array.isArray(items)) {
-        throw new Error("items phải là một mảng");
-      }
-      const createdItems = await Promise.all(
-        items.map((item) =>
-          OrderDetail.create({
-            orderId,
-            productId: item.productId,
-            quantily: item.quantily, // trường yêu cầu
-            price: item.price,
-          })
-        )
-      );
-      res.status(201).json({ message: "Order details created", orderDetails: createdItems });
+        const { orderId, items } = req.body;
+        console.log("Payload Order Detail:", req.body); // Log payload nhận được
+        if (!items || !Array.isArray(items)) {
+            throw new Error("items phải là một mảng");
+        }
+        const createdItems = await Promise.all(
+            items.map((item) =>
+                OrderDetail.create({
+                    orderId,
+                    productId: item.productId,
+                    quantily: item.quantily, // trường yêu cầu
+                    price: item.price,
+                })
+            )
+        );
+        res.status(201).json({ message: "Order details created", orderDetails: createdItems });
     } catch (error) {
-      console.error("Error creating order details:", error);
-      res.status(500).json({ message: error.message });
+        console.error("Error creating order details:", error);
+        res.status(500).json({ message: error.message });
     }
-  }
-  
-  
-  // Lấy Order Details theo orderId
-  async function getOrderDetailsByOrderId(req, res) {
+}
+
+
+// Lấy Order Details theo orderId
+async function getOrderDetailsByOrderId(req, res) {
     try {
-      const { orderId } = req.params;
-      const orderDetails = await OrderDetail.find({ orderId })
-        .populate("productId"); // Nếu muốn lấy thông tin sản phẩm
-      res.status(200).json({ orderDetails });
+        const { orderId } = req.params;
+        const orderDetails = await OrderDetail.find({ orderId })
+            .populate("productId"); // Nếu muốn lấy thông tin sản phẩm
+        res.status(200).json({ orderDetails });
     } catch (error) {
-      console.error("Error getting order details:", error);
-      res.status(500).json({ message: error.message });
+        console.error("Error getting order details:", error);
+        res.status(500).json({ message: error.message });
     }
-  }
+}
 //
 async function getAllAddresses(req, res) {
     try {
@@ -245,7 +374,7 @@ async function getAllAddresses(req, res) {
 };
 
 // Lấy địa chỉ theo ID
-async function getAddressById (req, res)  {
+async function getAddressById(req, res) {
     try {
         const { id } = req.params;
         const address = await addressModel.findById(id);
@@ -260,7 +389,7 @@ async function getAddressById (req, res)  {
 };
 
 // Tạo địa chỉ mới
-async function createAddress (req, res) {
+async function createAddress(req, res) {
     try {
         // Các dữ liệu cần thiết sẽ được gửi qua req.body
         const newAddress = new addressModel(req.body);
@@ -275,7 +404,7 @@ async function createAddress (req, res) {
 };
 
 // Cập nhật địa chỉ theo ID
-async function updateAddress (req, res) {
+async function updateAddress(req, res) {
     try {
         const { id } = req.params;
         const updateData = req.body;
@@ -296,7 +425,7 @@ async function updateAddress (req, res) {
 };
 
 // Xóa địa chỉ theo ID
-async function deleteAddress (req, res) {
+async function deleteAddress(req, res) {
     try {
         const { id } = req.params;
         const deletedAddress = await addressModel.findByIdAndDelete(id);
@@ -463,80 +592,78 @@ async function createMomoPaymentIntent(req, res) {
         return res.status(500).json({ mess: error.message });
     }
 }
-//thánh toán vn pay
-async function createVNPayPaymentIntent(req, res) {
-    try {
-      const { orderId, amount, orderInfo } = req.body;
-      // Gọi các biến môi trường từ .env thông qua process.env
-      const vnp_TmnCode = process.env.VNP_TMN_CODE;
-      const vnp_HashSecret = process.env.VNP_HASH_SECRET;
-      const vnp_PayUrl = process.env.VNP_PAY_URL;
-      const vnp_ReturnUrl = process.env.VNP_RETURN_URL;
-  
-      // Nếu VNPay yêu cầu số tiền nhỏ nhất:
-      const vnp_Amount = amount * 100;
-  
-      // Xây dựng các tham số cần gửi tới VNPay
-      let vnp_Params = {
-        vnp_Version: "2.0.0",
-        vnp_Command: "pay",
-        vnp_TmnCode: vnp_TmnCode,
-        vnp_Amount: vnp_Amount,
-        vnp_CurrCode: "VND",
-        vnp_TxnRef: orderId, // Mã đơn hàng duy nhất
-        vnp_OrderInfo: orderInfo || "Thanh toán đơn hàng",
-        vnp_OrderType: "other",
-        vnp_Locale: "vn",
-        vnp_ReturnUrl: vnp_ReturnUrl,
-        vnp_IpAddr: req.ip,
-        vnp_CreateDate: new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14)
-      };
-  
-      // Sắp xếp các tham số theo thứ tự từ điển
-      vnp_Params = sortObject(vnp_Params);
-  
-      // Tạo chuỗi query để ký số
-      const signData = querystring.stringify(vnp_Params, null, null, {
-        encodeURIComponent: (str) => str
-      });
-      // Tạo secure hash bằng HMAC SHA512
-      const hmac = crypto.createHmac("sha512", vnp_HashSecret);
-      const secureHash = hmac.update(signData).digest("hex");
-  
-      // Thêm secure hash vào tham số
-      vnp_Params.vnp_SecureHash = secureHash;
-      
-      // Tạo URL thanh toán
-      const paymentUrl = `${vnp_PayUrl}?${querystring.stringify(vnp_Params)}`;
-  
-      return res.status(200).json({ paymentUrl });
-    } catch (error) {
-      console.error("Lỗi tạo Payment VNPay:", error);
-      return res.status(500).json({ message: error.message });
-    }
-  }
-  
-  // Hàm sortObject (nếu cần)
-  function sortObject(obj) {
-    const keys = Object.keys(obj).sort();
-    const sortedObj = {};
-    keys.forEach(key => {
-      sortedObj[key] = obj[key];
-    });
-    return sortedObj;
-  }
-// Hàm sắp xếp object theo key (theo thứ tự từ điển)
-function sortObject(obj) {
-    let sorted = {};
-    Object.keys(obj)
-        .sort()
-        .forEach((key) => {
-            sorted[key] = obj[key];
-        });
-    return sorted;
+
+// Hàm chuyển đổi sang dạng không dấu (để xử lý các ký tự có dấu)
+function removeDiacritics(str) {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
 }
 
-//
+async function createVNPayPaymentIntent(req, res) {
+  try {
+    // Lấy dữ liệu đơn hàng từ request body
+    const { orderId, amount, orderInfo } = req.body;
+
+    // Lấy các biến môi trường (đảm bảo các biến này đã được set đúng)
+    const vnp_TmnCode    = process.env.VNP_TMN_CODE;
+    const vnp_HashSecret = process.env.VNP_HASH_SECRET;
+    const vnp_PayUrl     = process.env.VNP_PAY_URL;        // VD: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+    const vnp_ReturnUrl  = process.env.VNP_RETURN_URL;       // VD: http://localhost:3000/vnpay_return
+
+    // VNPay yêu cầu số tiền là số nguyên (đơn vị nhỏ nhất) -> nhân 100
+    const vnp_Amount = amount * 100;
+    
+    // Chuẩn hoá thông tin đơn hàng: loại bỏ khoảng trắng, chuyển sang dạng không dấu
+    const normalizedOrderInfo = removeDiacritics((orderInfo || "Thanh toán mua hàng").trim());
+    
+    // Thiết lập các tham số theo chuẩn VNPay với phiên bản "2.0.0"
+    let vnp_Params = {
+      vnp_Version: "2.0.0",               // dùng version 2.0.0 như code Ruby
+      vnp_Command: "pay",
+      vnp_TmnCode: vnp_TmnCode,
+      vnp_Amount: vnp_Amount,
+      vnp_CurrCode: "VND",
+      vnp_TxnRef: orderId,               // Mã đơn hàng duy nhất
+      vnp_OrderInfo: normalizedOrderInfo,
+      vnp_OrderType: "190000",           // Theo code Ruby, Order Type: "190000"
+      vnp_Locale: "vn",
+      vnp_ReturnUrl: vnp_ReturnUrl,
+      vnp_IpAddr: req.ip === "::ffff:127.0.0.1" ? "127.0.0.1" : req.ip,
+      vnp_CreateDate: moment().format("YYYYMMDDHHmmss")
+    };
+
+    // Sắp xếp các key theo thứ tự alphabet, sau đó tạo chuỗi dữ liệu gốc (original_data)
+    const sortedKeys = Object.keys(vnp_Params).sort();
+    const original_data = sortedKeys
+      .map(key => `${key}=${vnp_Params[key]}`)
+      .join("&");
+    console.log("Original data:", original_data);
+
+    // Tạo URL query từ input data (không cần encode vì Rails sẽ encode theo cách của nó)
+    let vnp_url = vnp_PayUrl + "?" + qs.stringify(vnp_Params);
+    
+    // Tính secure hash bằng SHA256 theo cách Ruby: hash = SHA256(vnp_hash_secret + original_data)
+    let vnp_security_hash = crypto
+      .createHash("sha256")
+      .update(vnp_HashSecret + original_data)
+      .digest("hex");
+    console.log("vnp_security_hash:", vnp_security_hash);
+
+    // Đính kèm các tham số bảo mật vào URL
+    vnp_url += '&vnp_SecureHashType=SHA256&vnp_SecureHash=' + vnp_security_hash;
+    console.log("Payment URL:", vnp_url);
+
+    // Chuyển hướng người dùng đến URL thanh toán
+    return res.redirect(vnp_url);
+  } catch (error) {
+    console.error("Lỗi tạo Payment VNPay:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
 async function resetPassword(req, res) {
     try {
         const { email, newPassword } = req.body;
@@ -644,44 +771,44 @@ async function createComment(req, res) {
 //kiểm tra người dùng like hay chưa
 async function toggleLike(req, res) {
     try {
-      const { id } = req.params;
-      const { userId } = req.body;
-  
-      // Kiểm tra userId có được gửi lên không
-      if (!userId) {
-        return res.status(400).json({ message: "User ID is required for toggling like" });
-      }
-  
-      // Lấy comment theo id
-      const comment = await commentModel.findById(id);
-      if (!comment) {
-        return res.status(404).json({ message: "Comment không tồn tại" });
-      }
-  
-      // Kiểm tra xem user đã like comment hay chưa
-      if (comment.likedBy.includes(userId)) {
-        // Nếu đã like -> hủy like: xóa userId khỏi likedBy
-        comment.likedBy.pull(userId);
-      } else {
-        // Nếu chưa like -> thực hiện like: thêm userId vào likedBy
-        comment.likedBy.push(userId);
-      }
-  
-      // Cập nhật lại số lượt like dựa trên độ dài của mảng likedBy
-      comment.likes = comment.likedBy.length;
-  
-      await comment.save();
-  
-      res.status(200).json({
-        message: comment.likedBy.includes(userId) ? "Comment đã được like" : "Đã hủy like comment",
-        comment
-      });
-  
+        const { id } = req.params;
+        const { userId } = req.body;
+
+        // Kiểm tra userId có được gửi lên không
+        if (!userId) {
+            return res.status(400).json({ message: "User ID is required for toggling like" });
+        }
+
+        // Lấy comment theo id
+        const comment = await commentModel.findById(id);
+        if (!comment) {
+            return res.status(404).json({ message: "Comment không tồn tại" });
+        }
+
+        // Kiểm tra xem user đã like comment hay chưa
+        if (comment.likedBy.includes(userId)) {
+            // Nếu đã like -> hủy like: xóa userId khỏi likedBy
+            comment.likedBy.pull(userId);
+        } else {
+            // Nếu chưa like -> thực hiện like: thêm userId vào likedBy
+            comment.likedBy.push(userId);
+        }
+
+        // Cập nhật lại số lượt like dựa trên độ dài của mảng likedBy
+        comment.likes = comment.likedBy.length;
+
+        await comment.save();
+
+        res.status(200).json({
+            message: comment.likedBy.includes(userId) ? "Comment đã được like" : "Đã hủy like comment",
+            comment
+        });
+
     } catch (error) {
-      console.error("Lỗi khi toggle like:", error);
-      res.status(500).json({ message: "Có lỗi xảy ra khi xử lý like", error: error.message });
+        console.error("Lỗi khi toggle like:", error);
+        res.status(500).json({ message: "Có lỗi xảy ra khi xử lý like", error: error.message });
     }
-  }
+}
 //lấy comment
 async function getComments(req, res) {
     try {
@@ -701,107 +828,107 @@ async function getComments(req, res) {
 //unlike comment
 async function unlikeComment(req, res) {
     try {
-      const { id } = req.params;
-  
-      // Cập nhật giảm 1 của trường likes chỉ khi likes hiện tại > 0
-      const updatedComment = await commentModel.findOneAndUpdate(
-        { _id: id, likes: { $gt: 0 } }, // chỉ update nếu likes > 0
-        { $inc: { likes: -1 } },
-        { new: true }
-      );
-  
-      if (!updatedComment) {
-        return res.status(404).json({ message: "Comment không tồn tại hoặc chưa có lượt like để hủy" });
-      }
-  
-      res.status(200).json({
-        message: "Đã hủy like comment",
-        comment: updatedComment
-      });
+        const { id } = req.params;
+
+        // Cập nhật giảm 1 của trường likes chỉ khi likes hiện tại > 0
+        const updatedComment = await commentModel.findOneAndUpdate(
+            { _id: id, likes: { $gt: 0 } }, // chỉ update nếu likes > 0
+            { $inc: { likes: -1 } },
+            { new: true }
+        );
+
+        if (!updatedComment) {
+            return res.status(404).json({ message: "Comment không tồn tại hoặc chưa có lượt like để hủy" });
+        }
+
+        res.status(200).json({
+            message: "Đã hủy like comment",
+            comment: updatedComment
+        });
     } catch (error) {
-      console.error("Lỗi khi hủy like comment:", error);
-      res.status(500).json({
-        message: "Có lỗi xảy ra khi hủy like comment",
-        error: error.message
-      });
+        console.error("Lỗi khi hủy like comment:", error);
+        res.status(500).json({
+            message: "Có lỗi xảy ra khi hủy like comment",
+            error: error.message
+        });
     }
-  }
+}
 //like comment
 async function likeComment(req, res) {
     try {
-      const { id } = req.params;
-      const updatedComment = await commentModel.findByIdAndUpdate(
-        id,
-        { $inc: { likes: 1 } },
-        { new: true }
-      );
-  
-      if (!updatedComment) {
-        return res.status(404).json({ message: "Comment không tồn tại" });
-      }
-  
-      res.status(200).json({
-        message: "Comment đã được like",
-        comment: updatedComment
-      });
+        const { id } = req.params;
+        const updatedComment = await commentModel.findByIdAndUpdate(
+            id,
+            { $inc: { likes: 1 } },
+            { new: true }
+        );
+
+        if (!updatedComment) {
+            return res.status(404).json({ message: "Comment không tồn tại" });
+        }
+
+        res.status(200).json({
+            message: "Comment đã được like",
+            comment: updatedComment
+        });
     } catch (error) {
-      console.error("Lỗi khi like comment:", error);
-      res.status(500).json({ message: "Có lỗi xảy ra khi like comment", error: error.message });
+        console.error("Lỗi khi like comment:", error);
+        res.status(500).json({ message: "Có lỗi xảy ra khi like comment", error: error.message });
     }
-  }
+}
 //sửa comment
 
 async function updateComment(req, res) {
-  try {
-    const { id } = req.params;
-    const { content, rating } = req.body;
+    try {
+        const { id } = req.params;
+        const { content, rating } = req.body;
 
-    // Khởi tạo đối tượng cập nhật, luôn cập nhật ngày
-    const updateData = {
-      date: new Date()
-    };
+        // Khởi tạo đối tượng cập nhật, luôn cập nhật ngày
+        const updateData = {
+            date: new Date()
+        };
 
-    // Nếu có content, kiểm tra tính hợp lệ và thêm vào đối tượng cập nhật
-    if (content !== undefined) {
-      if (typeof content !== 'string' || !content.trim()) {
-        return res.status(400).json({ message: "Nội dung comment không hợp lệ" });
-      }
-      updateData.content = content;
+        // Nếu có content, kiểm tra tính hợp lệ và thêm vào đối tượng cập nhật
+        if (content !== undefined) {
+            if (typeof content !== 'string' || !content.trim()) {
+                return res.status(400).json({ message: "Nội dung comment không hợp lệ" });
+            }
+            updateData.content = content;
+        }
+
+        // Nếu có rating được gửi lên, kiểm tra tính hợp lệ (ví dụ: số, trong khoảng 0 đến 5)
+        if (rating !== undefined) {
+            if (typeof rating !== 'number' || isNaN(rating) || rating < 0 || rating > 5) {
+                return res.status(400).json({ message: "Rating phải là số hợp lệ trong khoảng từ 0 đến 5" });
+            }
+            updateData.rating = rating;
+        }
+
+        // Nếu không có trường nào được cập nhật (tức cả content và rating đều không có)
+        if (!updateData.content && updateData.rating === undefined) {
+            return res.status(400).json({ message: "Không có thông tin cập nhật được cung cấp" });
+        }
+
+        // Cập nhật comment theo id
+        const updatedComment = await commentModel.findByIdAndUpdate(
+            id,
+            updateData,
+            { new: true, runValidators: true }
+        );
+
+        // Nếu không tìm thấy comment
+        if (!updatedComment) {
+            return res.status(404).json({ message: "Comment không tồn tại" });
+        }
+
+        res.status(200).json({
+            message: "Comment được cập nhật thành công",
+            comment: updatedComment
+        });
+    } catch (error) {
+        console.error("Lỗi cập nhật comment:", error);
+        res.status(500).json({ message: "Có lỗi xảy ra khi cập nhật comment", error: error.message });
     }
-
-    // Nếu có rating được gửi lên, kiểm tra tính hợp lệ (ví dụ: số, trong khoảng 0 đến 5)
-    if (rating !== undefined) {
-      if (typeof rating !== 'number' || isNaN(rating) || rating < 0 || rating > 5) {
-        return res.status(400).json({ message: "Rating phải là số hợp lệ trong khoảng từ 0 đến 5" });
-      }
-      updateData.rating = rating;
-    }
-
-    // Nếu không có trường nào được cập nhật (tức cả content và rating đều không có)
-    if (!updateData.content && updateData.rating === undefined) {
-      return res.status(400).json({ message: "Không có thông tin cập nhật được cung cấp" });
-    }
-
-    // Cập nhật comment theo id
-    const updatedComment = await commentModel.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    // Nếu không tìm thấy comment
-    if (!updatedComment) {
-      return res.status(404).json({ message: "Comment không tồn tại" });
-    }
-
-    res.status(200).json({
-      message: "Comment được cập nhật thành công",
-      comment: updatedComment
-    });
-  } catch (error) {
-    console.error("Lỗi cập nhật comment:", error);
-    res.status(500).json({ message: "Có lỗi xảy ra khi cập nhật comment", error: error.message });
-  }
 }
 
 
