@@ -53,11 +53,54 @@ module.exports = {
     likeComment, unlikeComment, toggleLike, createPost, getPosts,
     getPostBySlug, updatePost, deletePost, getPostById, confirmPayment,
     createFavorite, getFavoritesByUser, getFavoriteById, deleteFavorite,
-    getAllFavorites, getProByCataPage, getProductsFilter
+    getAllFavorites, getProByCataPage, getProductsFilter, getProductSearch
 
 }
+//tìm kiếm sản phẩm theo evryhting
+async function getProductSearch ({ field, keyword, page = 1, limit = 20 }) {
+    try {
+      // Tạo regex, tìm kiếm có chứa keyword (case-insensitive)
+      const regex = new RegExp(keyword, 'i');
+      let query = {};
+  
+      if (field === 'all') {
+        query = {
+          $or: [
+            { name: regex },
+            { title: regex },
+            { description: regex }
+            // Bạn có thể thêm các trường khác nếu cần, ví dụ:
+            // { 'categoryName': regex } nếu bạn đã lưu tên danh mục trong product,
+            // { 'authorName': regex } hoặc { 'publisherName': regex }
+          ]
+        };
+      } else if (field === 'category') {
+        // Nếu lưu category dưới dạng reference thì bạn có thể cần gọi lookup hoặc sắp xếp dữ liệu khác,
+        // Tuy nhiên, nếu product chứa trường categoryName thì:
+        query = { categoryName: regex };
+      } else if (field === 'author') {
+        // Tương tự cho tác giả, nếu product chứa authorName
+        query = { authorName: regex };
+      } else if (field === 'publisher') {
+        query = { publisherName: regex };
+      } else {
+        // Nếu field là một trong những trường chính của product, dùng trực tiếp:
+        query = { [field]: regex };
+      }
+  
+      const skip = (page - 1) * limit;
+      const products = await productModel.find(query)
+        .skip(skip)
+        .limit(limit);
+        
+      return products;
+    } catch (error) {
+      console.error("Error in getProductSearch:", error);
+      throw error;
+    }
+  };
+  
 //lấy product theo filter list 
-
 async function getProductsFilter(filter, skip, limit) {
     try {
       const products = await productModel.find(filter)
