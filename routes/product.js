@@ -95,11 +95,15 @@ router.get('/limit',async (req,res)=>{
 router.get('/page', async (req, res) => {
   try {
       // Lấy số trang và giới hạn số lượng từ yêu cầu
-      const { page = 1, limit = 10 } = req.query;
+      const { page = 1, limit = 20 } = req.query;
 
       // Chuyển đổi chúng thành số nguyên
-      const pageNum = parseInt(page);
-      const limitNum = parseInt(limit);
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+      
+      if (isNaN(pageNum) || isNaN(limitNum)) {
+        return res.status(400).json({ message: 'Page và limit phải là số hợp lệ' });
+      }
 
       // Lấy sản phẩm từ cơ sở dữ liệu
       const products = await productController.getProducts(pageNum, limitNum);
