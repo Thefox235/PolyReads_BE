@@ -53,9 +53,45 @@ module.exports = {
     likeComment, unlikeComment, toggleLike, createPost, getPosts,
     getPostBySlug, updatePost, deletePost, getPostById, confirmPayment,
     createFavorite, getFavoritesByUser, getFavoriteById, deleteFavorite,
-    getAllFavorites
+    getAllFavorites, getProByCataPage, getProductsFilter
 
 }
+//lấy product theo filter list 
+
+async function getProductsFilter(filter, skip, limit) {
+    try {
+      const products = await productModel.find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate('author')
+        .populate('publisher')
+        .populate('category');
+      return products;
+    } catch (error) {
+      console.error('Lỗi khi truy vấn sản phẩm:', error);
+      throw error;
+    }
+  }
+  
+//lấy product theo cate có phân trang
+async function getProByCataPage(categoryId, page = 1, limit = 20) {
+    try {
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+      const skipNum = (pageNum - 1) * limitNum;
+  
+      // Sử dụng từ khóa `new` khi tạo ObjectId
+      const products = await productModel
+        .find({ category: new mongoose.Types.ObjectId(categoryId) })
+        .skip(skipNum)
+        .limit(limitNum);
+        
+      return products;
+    } catch (error) {
+      console.error('Lỗi lấy sản phẩm theo danh mục với phân trang: ', error);
+      throw error;
+    }
+  }
 // controllers/favorite.controller.js
 async function getAllFavorites(req, res) {
     try {
@@ -2088,23 +2124,37 @@ async function getNewPro() {
 }
 async function getByKey(key, value) {
     try {
-      // Tạo regex để chỉ khớp với các chuỗi bắt đầu bằng 'value'
-      const regex = new RegExp('^' + value, 'i');
+      // Tạo regex để khớp các chuỗi bắt đầu bằng 'value' (không phân biệt chữ hoa chữ thường)
+      const regex = new RegExp(value, 'i');
   
-      // Tìm kiếm sản phẩm với điều kiện khớp prefix
-      let results = await productModel.find({ [key]: regex }, 'name price stock');
+      // Tìm kiếm sản phẩm với điều kiện khớp prefix mà không dùng projection nào,
+      // do đó đầy đủ thông tin được trả về
+      let results = await productModel.find({ [key]: regex });
   
-      // Mapping kết quả theo định dạng mong muốn
+      // Mapping kết quả theo định dạng mong muốn với các tên trường tiếng Anh
       results = results.map(result => ({
-        Masp: result._id,
-        Ten: result.name,
-        Gia: result.price,
-        SoLuong: result.stock
+        _id: result._id,
+        name: result.name,
+        title: result.title,
+        description: result.description,
+        price: result.price,
+        stock: result.stock,
+        weight: result.weight,
+        size: result.size,
+        pages: result.pages,
+        language: result.language,
+        format: result.format,
+        published_date: result.published_date,
+        sale_count: result.sale_count,
+        publisher: result.publisher,
+        category: result.category,
+        author: result.author,
+        discount: result.discount
       }));
   
       return results;
     } catch (error) {
-      console.error('Lỗi get product by key:', error);
+      console.error("Error in getByKey:", error);
     }
   }
 async function updateCateById(id, body) {
