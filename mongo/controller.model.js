@@ -29,6 +29,7 @@ const { log } = require('console')
 require('dotenv').config();
 const qs = require("qs");
 const moment = require("moment");
+const order_detailModel = require('./order_detail.model')
 
 module.exports = {
     insert, getAll, updateById,
@@ -59,205 +60,205 @@ module.exports = {
 //tìm kiếm sản phẩm theo evryhting
 async function getProductSearch ({ field, keyword, page = 1, limit = 20 }) {
     try {
-      // Tạo regex, tìm kiếm có chứa keyword (case-insensitive)
-      const regex = new RegExp(keyword, 'i');
-      let query = {};
-  
-      if (field === 'all') {
-        query = {
-          $or: [
-            { name: regex },
-            { title: regex },
-            { description: regex }
-            // Bạn có thể thêm các trường khác nếu cần, ví dụ:
-            // { 'categoryName': regex } nếu bạn đã lưu tên danh mục trong product,
-            // { 'authorName': regex } hoặc { 'publisherName': regex }
-          ]
-        };
-      } else if (field === 'category') {
-        // Nếu lưu category dưới dạng reference thì bạn có thể cần gọi lookup hoặc sắp xếp dữ liệu khác,
-        // Tuy nhiên, nếu product chứa trường categoryName thì:
-        query = { categoryName: regex };
-      } else if (field === 'author') {
-        // Tương tự cho tác giả, nếu product chứa authorName
-        query = { authorName: regex };
-      } else if (field === 'publisher') {
-        query = { publisherName: regex };
-      } else {
-        // Nếu field là một trong những trường chính của product, dùng trực tiếp:
-        query = { [field]: regex };
-      }
-  
-      const skip = (page - 1) * limit;
-      const products = await productModel.find(query)
-        .skip(skip)
-        .limit(limit);
-        
-      return products;
+        // Tạo regex, tìm kiếm có chứa keyword (case-insensitive)
+        const regex = new RegExp(keyword, 'i');
+        let query = {};
+
+        if (field === 'all') {
+            query = {
+                $or: [
+                    { name: regex },
+                    { title: regex },
+                    { description: regex }
+                    // Bạn có thể thêm các trường khác nếu cần, ví dụ:
+                    // { 'categoryName': regex } nếu bạn đã lưu tên danh mục trong product,
+                    // { 'authorName': regex } hoặc { 'publisherName': regex }
+                ]
+            };
+        } else if (field === 'category') {
+            // Nếu lưu category dưới dạng reference thì bạn có thể cần gọi lookup hoặc sắp xếp dữ liệu khác,
+            // Tuy nhiên, nếu product chứa trường categoryName thì:
+            query = { categoryName: regex };
+        } else if (field === 'author') {
+            // Tương tự cho tác giả, nếu product chứa authorName
+            query = { authorName: regex };
+        } else if (field === 'publisher') {
+            query = { publisherName: regex };
+        } else {
+            // Nếu field là một trong những trường chính của product, dùng trực tiếp:
+            query = { [field]: regex };
+        }
+
+        const skip = (page - 1) * limit;
+        const products = await productModel.find(query)
+            .skip(skip)
+            .limit(limit);
+
+        return products;
     } catch (error) {
-      console.error("Error in getProductSearch:", error);
-      throw error;
+        console.error("Error in getProductSearch:", error);
+        throw error;
     }
-  };
-  
+};
+
 //lấy product theo filter list 
 async function getProductsFilter(filter, skip, limit) {
     try {
-      const products = await productModel.find(filter)
-        .skip(skip)
-        .limit(limit)
-        .populate('author')
-        .populate('publisher')
-        .populate('category');
-      return products;
+        const products = await productModel.find(filter)
+            .skip(skip)
+            .limit(limit)
+            .populate('author')
+            .populate('publisher')
+            .populate('category');
+        return products;
     } catch (error) {
-      console.error('Lỗi khi truy vấn sản phẩm:', error);
-      throw error;
+        console.error('Lỗi khi truy vấn sản phẩm:', error);
+        throw error;
     }
-  }
-  
+}
+
 //lấy product theo cate có phân trang
 async function getProByCataPage(categoryId, page = 1, limit = 20) {
     try {
-      const pageNum = parseInt(page, 10);
-      const limitNum = parseInt(limit, 10);
-      const skipNum = (pageNum - 1) * limitNum;
-  
-      // Sử dụng từ khóa `new` khi tạo ObjectId
-      const products = await productModel
-        .find({ category: new mongoose.Types.ObjectId(categoryId) })
-        .skip(skipNum)
-        .limit(limitNum);
-        
-      return products;
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+        const skipNum = (pageNum - 1) * limitNum;
+
+        // Sử dụng từ khóa `new` khi tạo ObjectId
+        const products = await productModel
+            .find({ category: new mongoose.Types.ObjectId(categoryId) })
+            .skip(skipNum)
+            .limit(limitNum);
+
+        return products;
     } catch (error) {
-      console.error('Lỗi lấy sản phẩm theo danh mục với phân trang: ', error);
-      throw error;
+        console.error('Lỗi lấy sản phẩm theo danh mục với phân trang: ', error);
+        throw error;
     }
-  }
+}
 // controllers/favorite.controller.js
 async function getAllFavorites(req, res) {
     try {
-      const favorites = await favoriteModel.find({})
-        .populate("productId")
-        .populate("userId");
-      return res.status(200).json({ favorites });
+        const favorites = await favoriteModel.find({})
+            .populate("productId")
+            .populate("userId");
+        return res.status(200).json({ favorites });
     } catch (error) {
-      console.error("Lỗi khi lấy tất cả favorite:", error);
-      return res.status(500).json({ message: error.message });
+        console.error("Lỗi khi lấy tất cả favorite:", error);
+        return res.status(500).json({ message: error.message });
     }
-  }
+}
 
 async function createFavorite(req, res) {
-  try {
-    const { userId, productId } = req.body;
-    if (!userId || !productId) {
-      return res.status(400).json({ message: "userId và productId là bắt buộc." });
-    }
+    try {
+        const { userId, productId } = req.body;
+        if (!userId || !productId) {
+            return res.status(400).json({ message: "userId và productId là bắt buộc." });
+        }
 
-    // Kiểm tra xem favorite đã tồn tại chưa để tránh trùng lặp
-    const existingFavorite = await favoriteModel.findOne({ userId, productId });
-    if (existingFavorite) {
-      return res.status(400).json({ message: "Favorite đã tồn tại." });
-    }
+        // Kiểm tra xem favorite đã tồn tại chưa để tránh trùng lặp
+        const existingFavorite = await favoriteModel.findOne({ userId, productId });
+        if (existingFavorite) {
+            return res.status(400).json({ message: "Favorite đã tồn tại." });
+        }
 
-    const favorite = await favoriteModel.create({ userId, productId });
-    return res.status(201).json({
-      message: "Favorite được tạo thành công",
-      favorite
-    });
-  } catch (error) {
-    console.error("Lỗi tạo favorite:", error);
-    return res.status(500).json({ message: error.message });
-  }
+        const favorite = await favoriteModel.create({ userId, productId });
+        return res.status(201).json({
+            message: "Favorite được tạo thành công",
+            favorite
+        });
+    } catch (error) {
+        console.error("Lỗi tạo favorite:", error);
+        return res.status(500).json({ message: error.message });
+    }
 }
 
 async function getFavoritesByUser(req, res) {
-  try {
-    const { userId } = req.params;
-    if (!userId) {
-      return res.status(400).json({ message: "userId là bắt buộc." });
-    }
+    try {
+        const { userId } = req.params;
+        if (!userId) {
+            return res.status(400).json({ message: "userId là bắt buộc." });
+        }
 
-    // Populated nếu cần thông tin chi tiết về sản phẩm và người dùng
-    const favorites = await favoriteModel.find({ userId })
-      .populate("productId")
-      .populate("userId");
-    return res.status(200).json({ favorites });
-  } catch (error) {
-    console.error("Lỗi lấy favorites cho user:", error);
-    return res.status(500).json({ message: error.message });
-  }
+        // Populated nếu cần thông tin chi tiết về sản phẩm và người dùng
+        const favorites = await favoriteModel.find({ userId })
+            .populate("productId")
+            .populate("userId");
+        return res.status(200).json({ favorites });
+    } catch (error) {
+        console.error("Lỗi lấy favorites cho user:", error);
+        return res.status(500).json({ message: error.message });
+    }
 }
 
 async function getFavoriteById(req, res) {
-  try {
-    const { id } = req.params;
-    const favorite = await favoriteModel.findById(id)
-      .populate("productId")
-      .populate("userId");
-    if (!favorite) {
-      return res.status(404).json({ message: "Favorite không tồn tại." });
+    try {
+        const { id } = req.params;
+        const favorite = await favoriteModel.findById(id)
+            .populate("productId")
+            .populate("userId");
+        if (!favorite) {
+            return res.status(404).json({ message: "Favorite không tồn tại." });
+        }
+        return res.status(200).json({ favorite });
+    } catch (error) {
+        console.error("Lỗi lấy favorite theo id:", error);
+        return res.status(500).json({ message: error.message });
     }
-    return res.status(200).json({ favorite });
-  } catch (error) {
-    console.error("Lỗi lấy favorite theo id:", error);
-    return res.status(500).json({ message: error.message });
-  }
 }
 
 async function deleteFavorite(req, res) {
-  try {
-    const { id } = req.params;
-    const favorite = await favoriteModel.findByIdAndDelete(id);
-    if (!favorite) {
-      return res.status(404).json({ message: "Favorite không tồn tại." });
+    try {
+        const { id } = req.params;
+        const favorite = await favoriteModel.findByIdAndDelete(id);
+        if (!favorite) {
+            return res.status(404).json({ message: "Favorite không tồn tại." });
+        }
+        return res.status(200).json({ message: "Favorite đã được xóa thành công." });
+    } catch (error) {
+        console.error("Lỗi xóa favorite:", error);
+        return res.status(500).json({ message: error.message });
     }
-    return res.status(200).json({ message: "Favorite đã được xóa thành công." });
-  } catch (error) {
-    console.error("Lỗi xóa favorite:", error);
-    return res.status(500).json({ message: error.message });
-  }
 }
 
 //
 async function confirmPayment (req, res, next) {
     try {
-      // Lấy các thông số cần thiết từ body
-      const { orderId, paymentId, vnp_ResponseCode } = req.body;
-  
-      // Xác định trạng thái thanh toán mới dựa vào vnp_ResponseCode ("00" => success)
-      const newPaymentStatus = vnp_ResponseCode === '00' ? 'success' : 'failed';
-  
-      // Cập nhật Payment theo paymentId
-      const updatedPayment = await paymentModel.findByIdAndUpdate(
-        paymentId,
-        { status: newPaymentStatus },
-        { new: true }
-      );
-  
-      // Quy ước: payment_status của Order
-      // 0: pending, 1: success, 2: failed
-      const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
-  
-      // Cập nhật Order theo orderId (và lưu luôn paymentId vào field order.paymentId)
-      const updatedOrder = await orderModel.findByIdAndUpdate(
-        orderId,
-        { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
-        { new: true }
-      );
-  
-      return res.status(200).json({
-        message: "Cập nhật trạng thái thanh toán thành công",
-        payment: updatedPayment,
-        order: updatedOrder,
-      });
+        // Lấy các thông số cần thiết từ body
+        const { orderId, paymentId, vnp_ResponseCode } = req.body;
+
+        // Xác định trạng thái thanh toán mới dựa vào vnp_ResponseCode ("00" => success)
+        const newPaymentStatus = vnp_ResponseCode === '00' ? 'success' : 'failed';
+
+        // Cập nhật Payment theo paymentId
+        const updatedPayment = await paymentModel.findByIdAndUpdate(
+            paymentId,
+            { status: newPaymentStatus },
+            { new: true }
+        );
+
+        // Quy ước: payment_status của Order
+        // 0: pending, 1: success, 2: failed
+        const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
+
+        // Cập nhật Order theo orderId (và lưu luôn paymentId vào field order.paymentId)
+        const updatedOrder = await orderModel.findByIdAndUpdate(
+            orderId,
+            { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
+            { new: true }
+        );
+
+        return res.status(200).json({
+            message: "Cập nhật trạng thái thanh toán thành công",
+            payment: updatedPayment,
+            order: updatedOrder,
+        });
     } catch (error) {
-      console.error("Lỗi cập nhật trạng thái thanh toán:", error);
-      return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
+        console.error("Lỗi cập nhật trạng thái thanh toán:", error);
+        return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
     }
-  };
-    
+};
+
 //lấy post theo id
 // async function to get a post by its id
 async function getPostById(req, res) {
@@ -391,6 +392,7 @@ async function getOrdersByUserId(req, res) {
         }
         // Nếu userId ở database là ObjectId, bạn có thể ép chúng về chuỗi để so sánh
         const orders = await orderModel.find({ userId: userId })
+            .sort({ _id: -1 })
             .populate('userId')
             .populate('paymentId')
             .populate('addressId');
@@ -419,12 +421,23 @@ async function createOrderDetail(req, res) {
                 })
             )
         );
-        res.status(201).json({ message: "Order details created", orderDetails: createdItems });
+
+        // Cập nhật stock của sản phẩm: giảm đi số lượng đã đặt đối với mỗi sản phẩm
+        await Promise.all(
+            items.map(item =>
+                productModel.findByIdAndUpdate(
+                    item.productId,
+                    { $inc: { stock: -item.quantily } } // Giảm stock đi quantily
+                )
+            )
+        );
+        res.status(201).json({ message: "Order details created and product stocks updated", orderDetails: createdItems });
     } catch (error) {
         console.error("Error creating order details:", error);
         res.status(500).json({ message: error.message });
     }
 }
+
 
 
 // Lấy Order Details theo orderId
@@ -522,8 +535,9 @@ async function deleteAddress(req, res) {
 // Lấy tất cả đơn hàng
 async function getOrders(req, res) {
     try {
-        // Sử dụng populate để lấy thông tin liên quan nếu cần
+        // Sắp xếp theo _id giảm dần để order mới nhất xuất hiện trước
         const orders = await orderModel.find()
+            .sort({ _id: -1 })
             .populate('userId')
             .populate('paymentId')
             .populate('addressId');
@@ -595,7 +609,39 @@ async function updateOrder(req, res) {
     try {
         const orderId = req.params.id;
         const updateData = req.body;
-        const updatedOrder = await orderModel.findByIdAndUpdate(orderId, updateData, { new: true, runValidators: true });
+
+        // Lấy thông tin đơn hàng hiện tại để kiểm tra trạng thái
+        const currentOrder = await orderModel.findById(orderId);
+        if (!currentOrder) {
+            return res.status(404).json({ message: "Không tìm thấy Order để cập nhật" });
+        }
+
+        // Nếu có cập nhật trạng thái, hãy kiểm tra chuyển đổi có hợp lệ không
+        if (updateData.status !== undefined) {
+            const currentStatus = currentOrder.status;
+            const newStatus = updateData.status;
+
+            // Nếu đơn hàng đã hoàn tất, bị hủy hoặc đổi trả, không cho phép cập nhật trạng thái
+            if ([2, -1, 3].includes(currentStatus)) {
+                return res.status(400).json({
+                    message: "Đơn hàng đã ở trạng thái cuối (Hoàn tất, Bị hủy hoặc Đổi trả) nên không thể cập nhật thêm."
+                });
+            }
+
+            // Bạn có thể thêm logic kiểm tra bổ sung nếu muốn chỉ cho phép chuyển từ trạng thái 0 sang 1 hoặc từ 1 sang 2, v.v.
+            // Ví dụ:
+            // if (currentStatus === 0 && newStatus !== 1) { ... }
+        }
+
+        // Cập nhật đơn hàng và trả về dữ liệu đã được populate
+        const updatedOrder = await orderModel.findByIdAndUpdate(orderId, updateData, {
+            new: true,
+            runValidators: true,
+        })
+            .populate('userId')
+            .populate('paymentId')
+            .populate('addressId');
+
         if (!updatedOrder) {
             return res.status(404).json({ message: "Không tìm thấy Order để cập nhật" });
         }
@@ -604,8 +650,7 @@ async function updateOrder(req, res) {
         console.error("Lỗi cập nhật order:", error);
         res.status(500).json({ message: error.message });
     }
-};
-
+}
 // Xóa Order theo ID
 async function deleteOrder(req, res) {
     try {
@@ -674,73 +719,73 @@ async function createMomoPaymentIntent(req, res) {
 
 // Hàm chuyển đổi sang dạng không dấu (để xử lý các ký tự có dấu)
 function removeDiacritics(str) {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D");
+    return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D");
 }
 
 async function createVNPayPaymentIntent(req, res) {
-  try {
-    // Lấy dữ liệu đơn hàng từ request body
-    const { orderId, amount, orderInfo } = req.body;
+    try {
+        // Lấy dữ liệu đơn hàng từ request body
+        const { orderId, amount, orderInfo } = req.body;
 
-    // Lấy các biến môi trường (đảm bảo các biến này đã được set đúng)
-    const vnp_TmnCode    = process.env.VNP_TMN_CODE;
-    const vnp_HashSecret = process.env.VNP_HASH_SECRET;
-    const vnp_PayUrl     = process.env.VNP_PAY_URL;        // VD: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-    const vnp_ReturnUrl  = process.env.VNP_RETURN_URL;       // VD: http://localhost:3000/vnpay_return
+        // Lấy các biến môi trường (đảm bảo các biến này đã được set đúng)
+        const vnp_TmnCode = process.env.VNP_TMN_CODE;
+        const vnp_HashSecret = process.env.VNP_HASH_SECRET;
+        const vnp_PayUrl = process.env.VNP_PAY_URL;        // VD: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+        const vnp_ReturnUrl = process.env.VNP_RETURN_URL;       // VD: http://localhost:3000/vnpay_return
 
-    // VNPay yêu cầu số tiền là số nguyên (đơn vị nhỏ nhất) -> nhân 100
-    const vnp_Amount = amount * 100;
-    
-    // Chuẩn hoá thông tin đơn hàng: loại bỏ khoảng trắng, chuyển sang dạng không dấu
-    const normalizedOrderInfo = removeDiacritics((orderInfo || "Thanh toán mua hàng").trim());
-    
-    // Thiết lập các tham số theo chuẩn VNPay với phiên bản "2.0.0"
-    let vnp_Params = {
-      vnp_Version: "2.0.0",               // dùng version 2.0.0 như code Ruby
-      vnp_Command: "pay",
-      vnp_TmnCode: vnp_TmnCode,
-      vnp_Amount: vnp_Amount,
-      vnp_CurrCode: "VND",
-      vnp_TxnRef: orderId,               // Mã đơn hàng duy nhất
-      vnp_OrderInfo: normalizedOrderInfo,
-      vnp_OrderType: "190000",           // Theo code Ruby, Order Type: "190000"
-      vnp_Locale: "vn",
-      vnp_ReturnUrl: vnp_ReturnUrl,
-      vnp_IpAddr: req.ip === "::ffff:127.0.0.1" ? "127.0.0.1" : req.ip,
-      vnp_CreateDate: moment().format("YYYYMMDDHHmmss")
-    };
+        // VNPay yêu cầu số tiền là số nguyên (đơn vị nhỏ nhất) -> nhân 100
+        const vnp_Amount = amount * 100;
 
-    // Sắp xếp các key theo thứ tự alphabet, sau đó tạo chuỗi dữ liệu gốc (original_data)
-    const sortedKeys = Object.keys(vnp_Params).sort();
-    const original_data = sortedKeys
-      .map(key => `${key}=${vnp_Params[key]}`)
-      .join("&");
-    console.log("Original data:", original_data);
+        // Chuẩn hoá thông tin đơn hàng: loại bỏ khoảng trắng, chuyển sang dạng không dấu
+        const normalizedOrderInfo = removeDiacritics((orderInfo || "Thanh toán mua hàng").trim());
 
-    // Tạo URL query từ input data (không cần encode vì Rails sẽ encode theo cách của nó)
-    let vnp_url = vnp_PayUrl + "?" + qs.stringify(vnp_Params);
-    
-    // Tính secure hash bằng SHA256 theo cách Ruby: hash = SHA256(vnp_hash_secret + original_data)
-    let vnp_security_hash = crypto
-      .createHash("sha256")
-      .update(vnp_HashSecret + original_data)
-      .digest("hex");
-    console.log("vnp_security_hash:", vnp_security_hash);
+        // Thiết lập các tham số theo chuẩn VNPay với phiên bản "2.0.0"
+        let vnp_Params = {
+            vnp_Version: "2.0.0",               // dùng version 2.0.0 như code Ruby
+            vnp_Command: "pay",
+            vnp_TmnCode: vnp_TmnCode,
+            vnp_Amount: vnp_Amount,
+            vnp_CurrCode: "VND",
+            vnp_TxnRef: orderId,               // Mã đơn hàng duy nhất
+            vnp_OrderInfo: normalizedOrderInfo,
+            vnp_OrderType: "190000",           // Theo code Ruby, Order Type: "190000"
+            vnp_Locale: "vn",
+            vnp_ReturnUrl: vnp_ReturnUrl,
+            vnp_IpAddr: req.ip === "::ffff:127.0.0.1" ? "127.0.0.1" : req.ip,
+            vnp_CreateDate: moment().format("YYYYMMDDHHmmss")
+        };
 
-    // Đính kèm các tham số bảo mật vào URL
-    vnp_url += '&vnp_SecureHashType=SHA256&vnp_SecureHash=' + vnp_security_hash;
-    console.log("Payment URL:", vnp_url);
+        // Sắp xếp các key theo thứ tự alphabet, sau đó tạo chuỗi dữ liệu gốc (original_data)
+        const sortedKeys = Object.keys(vnp_Params).sort();
+        const original_data = sortedKeys
+            .map(key => `${key}=${vnp_Params[key]}`)
+            .join("&");
+        console.log("Original data:", original_data);
 
-    // Chuyển hướng người dùng đến URL thanh toán
-    return res.redirect(vnp_url);
-  } catch (error) {
-    console.error("Lỗi tạo Payment VNPay:", error);
-    return res.status(500).json({ message: error.message });
-  }
+        // Tạo URL query từ input data (không cần encode vì Rails sẽ encode theo cách của nó)
+        let vnp_url = vnp_PayUrl + "?" + qs.stringify(vnp_Params);
+
+        // Tính secure hash bằng SHA256 theo cách Ruby: hash = SHA256(vnp_hash_secret + original_data)
+        let vnp_security_hash = crypto
+            .createHash("sha256")
+            .update(vnp_HashSecret + original_data)
+            .digest("hex");
+        console.log("vnp_security_hash:", vnp_security_hash);
+
+        // Đính kèm các tham số bảo mật vào URL
+        vnp_url += '&vnp_SecureHashType=SHA256&vnp_SecureHash=' + vnp_security_hash;
+        console.log("Payment URL:", vnp_url);
+
+        // Chuyển hướng người dùng đến URL thanh toán
+        return res.redirect(vnp_url);
+    } catch (error) {
+        console.error("Lỗi tạo Payment VNPay:", error);
+        return res.status(500).json({ message: error.message });
+    }
 }
 
 async function resetPassword(req, res) {
@@ -816,37 +861,76 @@ async function sendForgotPasswordOTP(req, res) {
 //tạo comment
 async function createComment(req, res) {
     try {
-        const { userId, productId, content, rating } = req.body;
-
-        // Kiểm tra sự tồn tại của User
-        const user = await userModel.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        // Kiểm tra sự tồn tại của Product
-        const product = await productModel.findById(productId);
-        if (!product) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-
-        // Tạo mới bản ghi comment, explicit truyền cả các trường date và status
-        const comment = new commentModel({
-            userId,
-            productId,
-            content,
-            date: Date.now(),          // Thời gian hiện tại
-            status: "pending",
-            rating          // Trạng thái mặc định, bạn có thể thay đổi thành "approved" nếu cần
+      // Destructure thêm orderId từ req.body
+      const { userId, orderId, productId, content, rating } = req.body;
+  
+      // Kiểm tra sự tồn tại của user
+      const user = await userModel.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Kiểm tra sự tồn tại của product
+      const product = await productModel.findById(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+  
+      // Lấy danh sách đơn hàng của user có status hoàn thành (status === 2)
+      const completedOrders = await orderModel.find({ userId: userId, status: 2 });
+      if (!completedOrders || completedOrders.length === 0) {
+        return res.status(400).json({
+          message:
+            "Bạn chưa mua sản phẩm này hoặc đơn hàng của bạn chưa hoàn thành. Không được phép đánh giá."
         });
-        await comment.save();
-
-        res.status(201).json({ message: "Comment created successfully", comment });
+      }
+  
+      // Kiểm tra qua từng đơn hàng hoàn thành xem có đơn nào có order detail chứa productId không
+      let purchased = false;
+      for (const order of completedOrders) {
+        const detail = await order_detailModel.findOne({
+          orderId: order._id,
+          productId: productId
+        });
+        if (detail) {
+          purchased = true;
+          break;
+        }
+      }
+      if (!purchased) {
+        return res.status(400).json({
+          message:
+            "Bạn chưa mua sản phẩm này hoặc đơn hàng của bạn chưa hoàn thành. Không được phép đánh giá."
+        });
+      }
+  
+      // Kiểm tra nếu người dùng đã đánh giá sản phẩm này trong đơn hàng đó trước đó
+      const existingComment = await commentModel.findOne({ userId, productId, orderId });
+      if (existingComment) {
+        return res.status(400).json({
+          message:
+            "Bạn đã đánh giá sản phẩm này cho đơn hàng này rồi. Nếu muốn đánh giá lại, vui lòng mua sản phẩm lần nữa."
+        });
+      }
+  
+      // Tạo mới bình luận với trạng thái "pending"
+      const comment = new commentModel({
+        userId,
+        orderId, // lưu orderId vào bình luận
+        productId,
+        content,
+        date: Date.now(),
+        status: "pending",
+        rating
+      });
+      await comment.save();
+  
+      res.status(201).json({ message: "Comment created successfully", comment });
     } catch (error) {
-        console.error("Error creating comment:", error);
-        res.status(500).json({ message: "Error creating comment", error });
+      console.error("Error creating comment:", error);
+      res.status(500).json({ message: "Error creating comment", error });
     }
-};
+  }
 //kiểm tra người dùng like hay chưa
 async function toggleLike(req, res) {
     try {
@@ -2167,39 +2251,39 @@ async function getNewPro() {
 }
 async function getByKey(key, value) {
     try {
-      // Tạo regex để khớp các chuỗi bắt đầu bằng 'value' (không phân biệt chữ hoa chữ thường)
-      const regex = new RegExp(value, 'i');
-  
-      // Tìm kiếm sản phẩm với điều kiện khớp prefix mà không dùng projection nào,
-      // do đó đầy đủ thông tin được trả về
-      let results = await productModel.find({ [key]: regex });
-  
-      // Mapping kết quả theo định dạng mong muốn với các tên trường tiếng Anh
-      results = results.map(result => ({
-        _id: result._id,
-        name: result.name,
-        title: result.title,
-        description: result.description,
-        price: result.price,
-        stock: result.stock,
-        weight: result.weight,
-        size: result.size,
-        pages: result.pages,
-        language: result.language,
-        format: result.format,
-        published_date: result.published_date,
-        sale_count: result.sale_count,
-        publisher: result.publisher,
-        category: result.category,
-        author: result.author,
-        discount: result.discount
-      }));
-  
-      return results;
+        // Tạo regex để khớp các chuỗi bắt đầu bằng 'value' (không phân biệt chữ hoa chữ thường)
+        const regex = new RegExp(value, 'i');
+
+        // Tìm kiếm sản phẩm với điều kiện khớp prefix mà không dùng projection nào,
+        // do đó đầy đủ thông tin được trả về
+        let results = await productModel.find({ [key]: regex });
+
+        // Mapping kết quả theo định dạng mong muốn với các tên trường tiếng Anh
+        results = results.map(result => ({
+            _id: result._id,
+            name: result.name,
+            title: result.title,
+            description: result.description,
+            price: result.price,
+            stock: result.stock,
+            weight: result.weight,
+            size: result.size,
+            pages: result.pages,
+            language: result.language,
+            format: result.format,
+            published_date: result.published_date,
+            sale_count: result.sale_count,
+            publisher: result.publisher,
+            category: result.category,
+            author: result.author,
+            discount: result.discount
+        }));
+
+        return results;
     } catch (error) {
-      console.error("Error in getByKey:", error);
+        console.error("Error in getByKey:", error);
     }
-  }
+}
 async function updateCateById(id, body) {
     try {
         const pro = await categoryModel.findById(id);
