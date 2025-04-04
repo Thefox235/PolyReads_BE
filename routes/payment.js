@@ -4,6 +4,93 @@ const request = require('request');
 const moment = require('moment');
 const paymentController = require('../mongo/controller.model');
 const Payment = require('../mongo/payment.model');
+const CryptoJS = require("crypto-js");
+const axios = require('axios');
+
+const zalopayConfig = {
+  appid: process.env.ZALOPAY_APP_ID || "553",
+  key1: process.env.ZALOPAY_KEY1 || "9phuAOYhan4urywHTh0ndEXiV3pKHr5Q",
+  key2: process.env.ZALOPAY_KEY2 || "Iyz2habzyr7AG8SgvoBCbKwKi3UzlLi3",
+  // Ví dụ endpoint demo của ZaloPay
+  endpoint: "https://sb-openapi.zalopay.vn/v2/create"
+};
+/* 
+  Endpoint: POST /api/payment/create-zalopay 
+  Xử lý giao dịch thanh toán ZaloPay
+*/
+
+router.post("/create-zalopay", async (req, res) => {
+  try {
+    const { amount, orderInfo, redirectUrl, appUser, items } = req.body;
+    
+    // embeddata theo ví dụ tài liệu
+    const embeddata = { redirecturl: redirectUrl };
+    const orderItems = items || []; // Nếu không có, dùng mảng rỗng
+
+    // Tạo apptransid theo mẫu, ví dụ: "YYMMDD_random" hoặc theo mẫu của tài liệu
+    const transID = Math.floor(Math.random() * 1000000);
+    // Nếu tài liệu mẫu sử dụng dấu gạch nối, hãy dùng dấu gạch nối thay vì dấu gạch dưới
+    const apptransid = `${moment().format('YYMMDD')}-${transID}`;
+    const apptime = Date.now();
+
+    // Xây dựng payload theo đúng key của tài liệu API
+    const order = {
+      appid: zalopayConfig.appid,
+      apptransid: apptransid,
+      appuser: appUser || "user123",
+      apptime: apptime,
+      amount: amount,
+      item: JSON.stringify(orderItems),
+      embeddata: JSON.stringify(embeddata),
+      description: orderInfo
+      // Nếu API yêu cầu fields khác, bạn bổ sung ở đây
+    };
+
+    // Tạo chuỗi rawData theo định dạng theo tài liệu:
+    // rawData = appid + "|" + apptransid + "|" + appuser + "|" + amount + "|" + apptime + "|" + embeddata + "|" + item
+    const rawData = order.appid + "|" +
+                    order.apptransid + "|" +
+                    order.appuser + "|" +
+                    order.amount + "|" +
+                    order.apptime + "|" +
+                    order.embeddata + "|" +
+                    order.item;
+    const mac = CryptoJS.HmacSHA256(rawData, zalopayConfig.key1).toString();
+    order.mac = mac;
+
+    console.log("Order payload:", order);
+    console.log("RawData:", rawData);
+
+    // Gửi request đến API v2 của ZaloPay với JSON body
+    const response = await axios.post(zalopayConfig.endpoint, order, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      }
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error creating ZaloPay payment:", error.response ? error.response.data : error.message);
+    res.status(500).json({
+      error: "Error creating ZaloPay payment",
+      details: error.response ? error.response.data : error.message
+    });
+  }
+});
+
+
+
+
+/*
+  Endpoint callback (có thể dùng chung cho cả VNPay và ZaloPay nếu cần)
+  Ví dụ: POST /api/payment/callback
+*/
+router.post("/callback", (req, res) => {
+  const callbackData = req.body;
+  // Xác thực và cập nhật trạng thái đơn hàng...
+  res.status(200).end();
+});
 
 // Định nghĩa route cho việc cập nhật thanh toán.
 router.post('/create', async (req, res) => {
