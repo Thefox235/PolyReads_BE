@@ -10,6 +10,12 @@ const addressSchema = new Schema({
     province: { type: String, required: true }, // Tên tỉnh/thành phố
     ward: { type: String, required: true },     // Tên xã/phường
     default: { type: Boolean, required: true },
+    extraCodes: {
+        // Sử dụng kiểu Mixed để linh hoạt lưu trữ bất kỳ cấu trúc JSON nào
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
+      },
+    
     userId: { type: Schema.Types.ObjectId, ref: 'users', required: true },
 });
 

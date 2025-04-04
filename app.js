@@ -5,6 +5,7 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const mongoose = require ('mongoose');
 const cors = require ('cors');
+require('dotenv').config(); 
 
 require('./mongo/category.model');
 require('./mongo/product.model');
@@ -41,6 +42,7 @@ var commentRouter = require('./routes/comment');
 var publisherRouter = require('./routes/publisher');
 var discountApplyRoutes = require('./routes/discountApplyRoutes');
 var favoriteRouter = require('./routes/favorite');
+var shippingRouter = require('./routes/shipping');
 
 
 var app = express();
@@ -77,6 +79,7 @@ app.use ('/order-detail',order_detailRouter);
 app.use ('/comment',commentRouter);
 app.use ('/publisher',publisherRouter);
 app.use ('/favorite',favoriteRouter);
+app.use ('/shipping',shippingRouter);
 
 
 // app.use('/', indexRouter);
