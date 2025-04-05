@@ -4,83 +4,149 @@ const request = require('request');
 const moment = require('moment');
 const paymentController = require('../mongo/controller.model');
 const Payment = require('../mongo/payment.model');
-const CryptoJS = require("crypto-js");
-const axios = require('axios');
+const bodyParser = require('body-parser');
+const qs = require('qs');
+const axios = require('axios').default;
+const CryptoJS = require('crypto-js');
 
-const zalopayConfig = {
-  appid: process.env.ZALOPAY_APP_ID || "553",
-  key1: process.env.ZALOPAY_KEY1 || "9phuAOYhan4urywHTh0ndEXiV3pKHr5Q",
-  key2: process.env.ZALOPAY_KEY2 || "Iyz2habzyr7AG8SgvoBCbKwKi3UzlLi3",
-  // Ví dụ endpoint demo của ZaloPay
-  endpoint: "https://sb-openapi.zalopay.vn/v2/create"
+// Cấu hình ứng dụng (sandbox)
+const config = {
+  app_id: '2553', // Số app_id dạng chuỗi hoặc số (ở đây sẽ chuyển về số khi gửi payload)
+  key1: 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL',
+  key2: 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz',
+  endpoint: 'https://sb-openapi.zalopay.vn/v2/create',
 };
-/* 
-  Endpoint: POST /api/payment/create-zalopay 
-  Xử lý giao dịch thanh toán ZaloPay
-*/
 
-router.post("/create-zalopay", async (req, res) => {
+router.use(bodyParser.json());
+
+// --- Endpoint tạo đơn hàng (Payment) ---
+router.post('/zalopay/payment', async (req, res) => {
+  // Sử dụng giá trị FE truyền vào hoặc dùng mặc định nếu không có:
+  const appUser = req.body.appUser || 'user123';
+  const amount = req.body.amount || 50000;
+  const orderInfo = req.body.orderInfo || `Test thanh toán đơn hàng tài Shop`;
+
+  // Embed_data chứa cách chuyển hướng sau khi thanh toán thành công.
+  // FE không cần biết các chi tiết này, backend xử lý theo cấu hình cho sẵn:
+  const embed_data = {
+    redirecturl: 'http://localhost:3001/paymentResult?paymentMethod=zalopay', 
+    blacklistedBins: [],
+    whiteListedBins: []  
+  };
+
+  // Nếu có danh sách sản phẩm cụ thể FE có thể truyền, nếu không dùng mảng rỗng:
+  const items = req.body.items || [];
+
+  // Tạo mã giao dịch ngẫu nhiên theo định dạng "YYMMDD_XXXXXX"
+  const transID = Math.floor(Math.random() * 1000000);
+  const appTransId = `${moment().format('YYMMDD')}_${transID}`;
+
+  // Sử dụng Date.now() để lấy thời gian giao dịch (mili giây)
+  const appTime = Date.now();
+
+  // Xây dựng payload cho đơn hàng
+  const order = {
+    app_id: config.app_id, // giữ nguyên giá trị từ cấu hình
+    app_trans_id: appTransId,
+    app_user: appUser,
+    app_time: appTime,
+    amount: amount,
+    item: JSON.stringify(items),
+    embed_data: JSON.stringify(embed_data),
+    callback_url: 'https://b074-1-53-37-194.ngrok-free.app/callback',
+    description: orderInfo + ` - ${transID}`,
+    bank_code: '',
+    // version: "2.0.0" (nếu API yêu cầu, bạn có thể thêm ở đây)
+  };
+
+  // Tạo chuỗi dữ liệu theo thứ tự: app_id|app_trans_id|app_user|amount|app_time|embed_data|item
+  const data =
+    config.app_id + '|' +
+    order.app_trans_id + '|' +
+    order.app_user + '|' +
+    order.amount + '|' +
+    order.app_time + '|' +
+    order.embed_data + '|' +
+    order.item;
+
+  // Tính MAC với key1 sử dụng HMAC SHA256
+  order.mac = CryptoJS.HmacSHA256(data, config.key1).toString();
+
+  console.log("Order Payload:", order);
+
   try {
-    const { amount, orderInfo, redirectUrl, appUser, items } = req.body;
-    
-    // embeddata theo ví dụ tài liệu
-    const embeddata = { redirecturl: redirectUrl };
-    const orderItems = items || []; // Nếu không có, dùng mảng rỗng
-
-    // Tạo apptransid theo mẫu, ví dụ: "YYMMDD_random" hoặc theo mẫu của tài liệu
-    const transID = Math.floor(Math.random() * 1000000);
-    // Nếu tài liệu mẫu sử dụng dấu gạch nối, hãy dùng dấu gạch nối thay vì dấu gạch dưới
-    const apptransid = `${moment().format('YYMMDD')}-${transID}`;
-    const apptime = Date.now();
-
-    // Xây dựng payload theo đúng key của tài liệu API
-    const order = {
-      appid: zalopayConfig.appid,
-      apptransid: apptransid,
-      appuser: appUser || "user123",
-      apptime: apptime,
-      amount: amount,
-      item: JSON.stringify(orderItems),
-      embeddata: JSON.stringify(embeddata),
-      description: orderInfo
-      // Nếu API yêu cầu fields khác, bạn bổ sung ở đây
-    };
-
-    // Tạo chuỗi rawData theo định dạng theo tài liệu:
-    // rawData = appid + "|" + apptransid + "|" + appuser + "|" + amount + "|" + apptime + "|" + embeddata + "|" + item
-    const rawData = order.appid + "|" +
-                    order.apptransid + "|" +
-                    order.appuser + "|" +
-                    order.amount + "|" +
-                    order.apptime + "|" +
-                    order.embeddata + "|" +
-                    order.item;
-    const mac = CryptoJS.HmacSHA256(rawData, zalopayConfig.key1).toString();
-    order.mac = mac;
-
-    console.log("Order payload:", order);
-    console.log("RawData:", rawData);
-
-    // Gửi request đến API v2 của ZaloPay với JSON body
-    const response = await axios.post(zalopayConfig.endpoint, order, {
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
-      }
-    });
-
-    res.json(response.data);
+    const result = await axios.post(config.endpoint, null, { params: order });
+    // Trả kết quả từ ZaloPay về cho FE
+    return res.status(200).json(result.data);
   } catch (error) {
-    console.error("Error creating ZaloPay payment:", error.response ? error.response.data : error.message);
-    res.status(500).json({
-      error: "Error creating ZaloPay payment",
-      details: error.response ? error.response.data : error.message
-    });
+    console.error("Error:", error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
+// --- Endpoint callback (ZaloPay sẽ call đến sau khi giao dịch thành công) ---
+router.post('/zalopay/callback', (req, res) => {
+  // Log dữ liệu callback từ ZaloPay
+  console.log("ZaloPay callback data received:", req.body);
+  
+  let result = {};
+  try {
+    const dataStr = req.body.data;
+    const reqMac = req.body.mac;
+    const mac = CryptoJS.HmacSHA256(dataStr, config.key2).toString();
+    console.log('Calculated MAC:', mac);
 
+    if (reqMac !== mac) {
+      result.return_code = -1;
+      result.return_message = 'MAC không khớp';
+    } else {
+      const dataJson = JSON.parse(dataStr);
+      console.log("Cập nhật trạng thái thành công cho đơn hàng, app_trans_id:", dataJson.app_trans_id);
+      result.return_code = 1;
+      result.return_message = 'success';
+    }
+  } catch (ex) {
+    console.error('Lỗi callback:', ex.message);
+    result.return_code = 0;
+    result.return_message = ex.message;
+  }
+  
+  // In log kết quả trả về từ callback trước khi gửi đáp lại cho ZaloPay
+  console.log("Response from callback endpoint:", result);
+  res.json(result);
+});
 
+// --- Endpoint kiểm tra trạng thái đơn hàng ---
+router.post('/zalopay/check-status-order', async (req, res) => {
+  const { app_trans_id } = req.body;
+
+  let postData = {
+    app_id: config.app_id,
+    app_trans_id: app_trans_id,
+  };
+
+  // Tạo chuỗi dữ liệu: app_id|app_trans_id|key1
+  const data = postData.app_id + '|' + postData.app_trans_id + '|' + config.key1;
+  postData.mac = CryptoJS.HmacSHA256(data, config.key1).toString();
+
+  let postConfig = {
+    method: 'post',
+    url: 'https://sb-openapi.zalopay.vn/v2/query',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    data: qs.stringify(postData),
+  };
+
+  try {
+    const result = await axios(postConfig);
+    console.log("Query result:", result.data);
+    return res.status(200).json(result.data);
+  } catch (error) {
+    console.error('Error in check-status-order:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 /*
   Endpoint callback (có thể dùng chung cho cả VNPay và ZaloPay nếu cần)
@@ -140,31 +206,31 @@ function sortObject(obj) {
 router.post('/verify', (req, res, next) => {
   // Lấy các tham số được gửi từ VNPay (FE có thể chuyển các tham số từ window.location.search)
   let vnp_Params = req.body; // hoặc req.query nếu gửi qua GET
-  
+
   // Lấy secureHash được gửi về từ VNPay
   let secureHash = vnp_Params.vnp_SecureHash;
   // Xóa đi secure hash để tính lại chữ ký
   delete vnp_Params.vnp_SecureHash;
   delete vnp_Params.vnp_SecureHashType;
-  
+
   // Sắp xếp các tham số theo thứ tự tăng dần của key
   vnp_Params = sortObject(vnp_Params);
-  
+
   // Tạo chuỗi ký (string to sign)
   let signData = qs.stringify(vnp_Params, { encode: false });
-  
+
   // Tính chữ ký HMAC SHA512 với secretKey
   let secretKey = config.get('vnp_HashSecret');
   let computedHash = crypto.createHmac("sha512", secretKey)
-                           .update(Buffer.from(signData, 'utf-8'))
-                           .digest('hex');
-  
+    .update(Buffer.from(signData, 'utf-8'))
+    .digest('hex');
+
   // So sánh chữ ký nhận được và chữ ký tự tính
   let result = {};
   if (secureHash === computedHash) {
     if (vnp_Params.vnp_ResponseCode === "00") {
-      result = { 
-        code: vnp_Params.vnp_ResponseCode, 
+      result = {
+        code: vnp_Params.vnp_ResponseCode,
         message: "Thanh toán thành công",
         data: vnp_Params
       };

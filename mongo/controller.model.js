@@ -56,170 +56,299 @@ module.exports = {
     createFavorite, getFavoritesByUser, getFavoriteById, deleteFavorite,
     getAllFavorites, getProByCataPage, getProductsFilter, getProductSearch,
     calculateShippingFee, getWards, getDistricts, getProvinces, getCities,
-    getWardsByDistrict, getDistrictsByCity, getRates
+    getWardsByDistrict, getDistrictsByCity, getRates, notifyCustomer,
+    createFullOrder
 
 }
+//
+async function createFullOrder(req, res, next) {
+    try {
+      // Lấy dữ liệu từ req.body
+      const {
+        name,
+        quantity,
+        img,
+        price,
+        status,
+        payment_status,
+        total,
+        userId,
+        paymentId,
+        addressId,
+        customerName,
+        customerEmail,
+        items  // mảng các sản phẩm, mỗi item có các trường: productId, quantily, price, name
+      } = req.body;
+  
+      if (!items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "items phải là một mảng" });
+      }
+  
+      // 1. Tạo Order
+      const newOrder = new orderModel({
+        name,
+        quantity,
+        img,
+        price,
+        status,
+        payment_status,
+        total,
+        userId,
+        paymentId,
+        addressId,
+        date: new Date(),
+        customerName,
+        customerEmail
+      });
+      const savedOrder = await newOrder.save();
+  
+      // 2. Tạo Order Detail cho từng sản phẩm
+      const createdItems = await Promise.all(
+        items.map(item =>
+          OrderDetail.create({
+            orderId: savedOrder._id,
+            productId: item.productId,
+            quantily: item.quantily,
+            price: item.price,
+            name: item.name
+          })
+        )
+      );
+  
+      // 3. Cập nhật tồn kho cho mỗi sản phẩm
+      await Promise.all(
+        items.map(item =>
+          productModel.findByIdAndUpdate(
+            item.productId,
+            { $inc: { stock: -item.quantily } }
+          )
+        )
+      );
+  
+      // Gộp thông tin order với order detail để gửi email
+      const fullOrder = {
+        ...savedOrder._doc,
+        items: createdItems
+      };
+  
+      // 4. Gửi email thông báo cho khách hàng
+      await notifyCustomer(fullOrder);
+  
+      // Trả về response cho FE
+      return res.status(201).json({
+        message: "Order và order details được tạo thành công, email đã được gửi",
+        order: fullOrder
+      });
+    } catch (error) {
+      console.error("Lỗi tạo đơn hàng đầy đủ:", error);
+      return res.status(500).json({ message: error.message });
+    }
+  }
+  
 // controllers/shippingController.js
+async function notifyCustomer (order) {
+    // Xây dựng nội dung email theo thông tin đơn hàng
+    const htmlContent = `
+      <p>Chào ${order.customerName},</p>
+      <p>Cảm ơn bạn đã đặt hàng tại Shop của chúng tôi. Dưới đây là thông tin đơn hàng của bạn:</p>
+      <p><strong>Mã đơn hàng:</strong> ${order._id}</p>
+      <ul>
+        ${order.items
+          .map(
+            (item) => `<li>${item.name} - ${item.quantily} x ${new Intl.NumberFormat('vi-VN', {
+              style: 'currency',
+              currency: 'VND'
+            }).format(item.price)} = ${new Intl.NumberFormat('vi-VN', {
+              style: 'currency',
+              currency: 'VND'
+            }).format(item.price * item.quantily)}</li>`
+          )
+          .join('')}
+      </ul>
+      <p><strong>Tổng tiền:</strong> ${new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND'
+      }).format(order.total)}</p>
+      <p>Chúng tôi sẽ nhanh chóng xử lý đơn hàng của bạn và thông báo khi đơn hàng được giao.</p>
+      <p>Trân trọng,<br>Team Shop</p>
+    `;
+  
+    const subject = `Thông báo đơn hàng ${order._id} từ Shop của chúng tôi`;
+  
+    try {
+      const mailPayload = {
+        email: order.customerEmail, // Email của khách hàng
+        subject,
+        html: htmlContent
+      };
+  
+      const result = await sendMail(mailPayload);
+      console.log("Notification email sent:", result.messageId);
+    } catch (error) {
+      console.error("Error sending notification email:", error);
+    }
+  };
+  
 //lấy thông tin giao hàng 
 async function getRates(req, res) {
     try {
-      // Lấy payload từ req.body để sử dụng dữ liệu từ FE
-      const payload = req.body;
-  
-      // Lấy token từ biến môi trường hoặc sử dụng giá trị tạm thời
-      const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
-  
-      const response = await axios.post(
-        'http://sandbox.goship.io/api/v2/rates',
-        payload,
-        {
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-  
-      return res.status(200).json(response.data);
+        // Lấy payload từ req.body để sử dụng dữ liệu từ FE
+        const payload = req.body;
+
+        // Lấy token từ biến môi trường hoặc sử dụng giá trị tạm thời
+        const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
+
+        const response = await axios.post(
+            'http://sandbox.goship.io/api/v2/rates',
+            payload,
+            {
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        return res.status(200).json(response.data);
     } catch (error) {
-      console.error(
-        "Lỗi khi lấy rates từ Goship:",
-        error.response ? error.response.data : error.message
-      );
-      return res.status(500).json({ message: error.message });
+        console.error(
+            "Lỗi khi lấy rates từ Goship:",
+            error.response ? error.response.data : error.message
+        );
+        return res.status(500).json({ message: error.message });
     }
-  }
-  
+}
+
 async function getDistrictsByCity(req, res) {
     try {
-      const { code } = req.params; // Code của thành phố
-      const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
-      const url = `http://sandbox.goship.io/api/v2/cities/${code}/districts`;
-      const response = await axios.get(url, {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
-      return res.status(200).json(response.data);
+        const { code } = req.params; // Code của thành phố
+        const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
+        const url = `http://sandbox.goship.io/api/v2/cities/${code}/districts`;
+        const response = await axios.get(url, {
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            }
+        });
+        return res.status(200).json(response.data);
     } catch (error) {
-      console.error("Lỗi khi lấy districts:", error.response ? error.response.data : error.message);
-      return res.status(500).json({ message: error.message });
+        console.error("Lỗi khi lấy districts:", error.response ? error.response.data : error.message);
+        return res.status(500).json({ message: error.message });
     }
-  }
-  
-  /**
-   * Lấy danh sách phường theo mã quận/huyện từ Goship Sandbox API
-   * Endpoint: http://sandbox.goship.io/api/v2/districts/{code}/wards
-   */
-  async function getWardsByDistrict(req, res) {
+}
+
+/**
+ * Lấy danh sách phường theo mã quận/huyện từ Goship Sandbox API
+ * Endpoint: http://sandbox.goship.io/api/v2/districts/{code}/wards
+ */
+async function getWardsByDistrict(req, res) {
     try {
-      const { code } = req.params; // Code của quận/huyện
-      const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
-      const url = `http://sandbox.goship.io/api/v2/districts/${code}/wards`;
-      const response = await axios.get(url, {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
-      return res.status(200).json(response.data);
+        const { code } = req.params; // Code của quận/huyện
+        const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
+        const url = `http://sandbox.goship.io/api/v2/districts/${code}/wards`;
+        const response = await axios.get(url, {
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            }
+        });
+        return res.status(200).json(response.data);
     } catch (error) {
-      console.error("Lỗi khi lấy wards:", error.response ? error.response.data : error.message);
-      return res.status(500).json({ message: error.message });
+        console.error("Lỗi khi lấy wards:", error.response ? error.response.data : error.message);
+        return res.status(500).json({ message: error.message });
     }
-  }
-  
+}
+
 async function getCities(req, res) {
     try {
-      // Lấy token từ biến môi trường hoặc thay thế bằng token tĩnh nếu cần
-      const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
-      
-      // Gọi Goship API
-      const response = await axios.get('http://sandbox.goship.io/api/v2/cities', {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
-      
-      // Trả về dữ liệu JSON nhận được từ Goship
-      return res.status(200).json(response.data);
+        // Lấy token từ biến môi trường hoặc thay thế bằng token tĩnh nếu cần
+        const token = process.env.GOSHIP_TOKEN || 'YOUR_TOKEN_HERE';
+
+        // Gọi Goship API
+        const response = await axios.get('http://sandbox.goship.io/api/v2/cities', {
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        // Trả về dữ liệu JSON nhận được từ Goship
+        return res.status(200).json(response.data);
     } catch (error) {
-      // Log lỗi để gỡ rối
-      console.error("Lỗi khi lấy cities từ Goship:", error.response ? error.response.data : error.message);
-      return res.status(500).json({ message: error.message });
+        // Log lỗi để gỡ rối
+        console.error("Lỗi khi lấy cities từ Goship:", error.response ? error.response.data : error.message);
+        return res.status(500).json({ message: error.message });
     }
-  }
-  
+}
+
 /**
  * Lấy danh sách các tỉnh thành từ GHN.
  */
 async function getProvinces(req, res) {
     try {
-      const axios = require('axios');
-      const url = 'https://online-gateway.ghn.vn/shiip/public-api/master-data/province';
-      const response = await axios.get(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          Token: process.env.GHN_API_TOKEN  // Lấy token từ biến môi trường
-        }
-      });
-      res.json(response.data);
+        const axios = require('axios');
+        const url = 'https://online-gateway.ghn.vn/shiip/public-api/master-data/province';
+        const response = await axios.get(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                Token: process.env.GHN_API_TOKEN  // Lấy token từ biến môi trường
+            }
+        });
+        res.json(response.data);
     } catch (error) {
-      console.error('Error in getProvinces:', error.response ? error.response.data : error.message);
-      res.status(500).json({ message: error.message });
+        console.error('Error in getProvinces:', error.response ? error.response.data : error.message);
+        res.status(500).json({ message: error.message });
     }
-  }
-  
-  /**
-   * Lấy danh sách các quận/huyện từ GHN.
-   */
-  async function getDistricts(req, res) {
+}
+
+/**
+ * Lấy danh sách các quận/huyện từ GHN.
+ */
+async function getDistricts(req, res) {
     try {
-      const axios = require('axios');
-      const url = 'https://online-gateway.ghn.vn/shiip/public-api/master-data/district';
-      const response = await axios.get(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          Token: process.env.GHN_API_TOKEN
-        }
-      });
-      res.json(response.data);
+        const axios = require('axios');
+        const url = 'https://online-gateway.ghn.vn/shiip/public-api/master-data/district';
+        const response = await axios.get(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                Token: process.env.GHN_API_TOKEN
+            }
+        });
+        res.json(response.data);
     } catch (error) {
-      console.error('Error in getDistricts:', error.response ? error.response.data : error.message);
-      res.status(500).json({ message: error.message });
+        console.error('Error in getDistricts:', error.response ? error.response.data : error.message);
+        res.status(500).json({ message: error.message });
     }
-  }
-  
-  /**
-   * Lấy danh sách các phường/xã từ GHN dựa theo district_id gửi qua query.
-   */
-  async function getWards(req, res) {
+}
+
+/**
+ * Lấy danh sách các phường/xã từ GHN dựa theo district_id gửi qua query.
+ */
+async function getWards(req, res) {
     try {
-      const axios = require('axios');
-      var district_id = req.query.district_id;
-      if (!district_id) {
-        res.status(400).json({ message: 'Query parameter "district_id" is required' });
-        return;
-      }
-      const url = 'https://online-gateway.ghn.vn/shiip/public-api/master-data/ward?district_id=' + district_id;
-      const response = await axios.get(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          Token: process.env.GHN_API_TOKEN
+        const axios = require('axios');
+        var district_id = req.query.district_id;
+        if (!district_id) {
+            res.status(400).json({ message: 'Query parameter "district_id" is required' });
+            return;
         }
-      });
-      res.json(response.data);
+        const url = 'https://online-gateway.ghn.vn/shiip/public-api/master-data/ward?district_id=' + district_id;
+        const response = await axios.get(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                Token: process.env.GHN_API_TOKEN
+            }
+        });
+        res.json(response.data);
     } catch (error) {
-      console.error('Error in getWards:', error.response ? error.response.data : error.message);
-      res.status(500).json({ message: error.message });
+        console.error('Error in getWards:', error.response ? error.response.data : error.message);
+        res.status(500).json({ message: error.message });
     }
-  }
+}
 async function calculateShippingFee(req, res) {
     try {
         // Nhận các thông tin cần thiết từ req.body do FE truyền lên.
@@ -453,40 +582,40 @@ async function deleteFavorite(req, res) {
 //
 async function confirmPayment(req, res, next) {
     try {
-        // Lấy các thông số cần thiết từ body
-        const { orderId, paymentId, vnp_ResponseCode } = req.body;
-
-        // Xác định trạng thái thanh toán mới dựa vào vnp_ResponseCode ("00" => success)
-        const newPaymentStatus = vnp_ResponseCode === '00' ? 'success' : 'failed';
-
-        // Cập nhật Payment theo paymentId
-        const updatedPayment = await paymentModel.findByIdAndUpdate(
-            paymentId,
-            { status: newPaymentStatus },
-            { new: true }
-        );
-
-        // Quy ước: payment_status của Order
-        // 0: pending, 1: success, 2: failed
-        const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
-
-        // Cập nhật Order theo orderId (và lưu luôn paymentId vào field order.paymentId)
-        const updatedOrder = await orderModel.findByIdAndUpdate(
-            orderId,
-            { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
-            { new: true }
-        );
-
-        return res.status(200).json({
-            message: "Cập nhật trạng thái thanh toán thành công",
-            payment: updatedPayment,
-            order: updatedOrder,
-        });
+      // FE gửi trường unified 'responseCode' với các quy ước:
+      // VNPay: "00" khi thành công, Zalopay: "1" khi thành công
+      const { orderId, paymentId, responseCode } = req.body;
+  
+      // Xác định trạng thái thanh toán: thành công nếu responseCode là "00" (VNPay) hoặc "1" (Zalopay)
+      const newPaymentStatus = (responseCode === '00' || responseCode === '1') ? 'success' : 'failed';
+  
+      // Cập nhật Payment theo paymentId
+      const updatedPayment = await paymentModel.findByIdAndUpdate(
+        paymentId,
+        { status: newPaymentStatus },
+        { new: true }
+      );
+  
+      // Quy ước: payment_status của Order: 0: pending, 1: success, 2: failed
+      const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
+  
+      // Cập nhật Order theo orderId và lưu luôn paymentId
+      const updatedOrder = await orderModel.findByIdAndUpdate(
+        orderId,
+        { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
+        { new: true }
+      );
+  
+      return res.status(200).json({
+        message: "Cập nhật trạng thái thanh toán thành công",
+        payment: updatedPayment,
+        order: updatedOrder,
+      });
     } catch (error) {
-        console.error("Lỗi cập nhật trạng thái thanh toán:", error);
-        return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
+      console.error("Lỗi cập nhật trạng thái thanh toán:", error);
+      return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
     }
-};
+  }
 
 //lấy post theo id
 // async function to get a post by its id
@@ -685,82 +814,82 @@ async function getOrderDetailsByOrderId(req, res) {
 // Lấy tất cả các địa chỉ
 async function getAllAddresses(req, res) {
     try {
-      // Có thể lọc theo userId nếu FE truyền lên qua req.query
-      const filter = req.query.userId ? { userId: req.query.userId } : {};
-      const addresses = await addressModel.find(filter);
-      return res.status(200).json({ addresses });
+        // Có thể lọc theo userId nếu FE truyền lên qua req.query
+        const filter = req.query.userId ? { userId: req.query.userId } : {};
+        const addresses = await addressModel.find(filter);
+        return res.status(200).json({ addresses });
     } catch (error) {
-      console.error("Lỗi lấy danh sách địa chỉ:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi lấy danh sách địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
-  
-  // Lấy địa chỉ theo ID
-  async function getAddressById(req, res) {
+}
+
+// Lấy địa chỉ theo ID
+async function getAddressById(req, res) {
     try {
-      const { id } = req.params;
-      const address = await addressModel.findById(id);
-      if (!address) {
-        return res.status(404).json({ mess: "Không tìm thấy địa chỉ" });
-      }
-      return res.status(200).json({ address });
+        const { id } = req.params;
+        const address = await addressModel.findById(id);
+        if (!address) {
+            return res.status(404).json({ mess: "Không tìm thấy địa chỉ" });
+        }
+        return res.status(200).json({ address });
     } catch (error) {
-      console.error("Lỗi lấy địa chỉ:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi lấy địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
-  
-  // Tạo địa chỉ mới
-  async function createAddress(req, res) {
+}
+
+// Tạo địa chỉ mới
+async function createAddress(req, res) {
     try {
-      // Dữ liệu nhận từ FE có thể bao gồm trường extraCodes chứa các thông tin mã vùng bổ sung
-      const newAddress = new addressModel(req.body);
-      const savedAddress = await newAddress.save();
-      return res
-        .status(201)
-        .json({ mess: "Địa chỉ được tạo thành công", address: savedAddress });
+        // Dữ liệu nhận từ FE có thể bao gồm trường extraCodes chứa các thông tin mã vùng bổ sung
+        const newAddress = new addressModel(req.body);
+        const savedAddress = await newAddress.save();
+        return res
+            .status(201)
+            .json({ mess: "Địa chỉ được tạo thành công", address: savedAddress });
     } catch (error) {
-      console.error("Lỗi tạo địa chỉ:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi tạo địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
-  
-  // Cập nhật địa chỉ theo ID
-  async function updateAddress(req, res) {
+}
+
+// Cập nhật địa chỉ theo ID
+async function updateAddress(req, res) {
     try {
-      const { id } = req.params;
-      const updateData = req.body;
-      const updatedAddress = await addressModel.findByIdAndUpdate(id, updateData, {
-        new: true,
-        runValidators: true,
-      });
-      if (!updatedAddress) {
-        return res.status(404).json({ mess: "Không tìm thấy địa chỉ để cập nhật" });
-      }
-      return res
-        .status(200)
-        .json({ mess: "Địa chỉ được cập nhật thành công", address: updatedAddress });
+        const { id } = req.params;
+        const updateData = req.body;
+        const updatedAddress = await addressModel.findByIdAndUpdate(id, updateData, {
+            new: true,
+            runValidators: true,
+        });
+        if (!updatedAddress) {
+            return res.status(404).json({ mess: "Không tìm thấy địa chỉ để cập nhật" });
+        }
+        return res
+            .status(200)
+            .json({ mess: "Địa chỉ được cập nhật thành công", address: updatedAddress });
     } catch (error) {
-      console.error("Lỗi cập nhật địa chỉ:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi cập nhật địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
-  
-  // Xóa địa chỉ theo ID
-  async function deleteAddress(req, res) {
+}
+
+// Xóa địa chỉ theo ID
+async function deleteAddress(req, res) {
     try {
-      const { id } = req.params;
-      const deletedAddress = await addressModel.findByIdAndDelete(id);
-      if (!deletedAddress) {
-        return res.status(404).json({ mess: "Không tìm thấy địa chỉ để xóa" });
-      }
-      return res.status(200).json({ mess: "Địa chỉ đã được xóa thành công" });
+        const { id } = req.params;
+        const deletedAddress = await addressModel.findByIdAndDelete(id);
+        if (!deletedAddress) {
+            return res.status(404).json({ mess: "Không tìm thấy địa chỉ để xóa" });
+        }
+        return res.status(200).json({ mess: "Địa chỉ đã được xóa thành công" });
     } catch (error) {
-      console.error("Lỗi xóa địa chỉ:", error);
-      return res.status(500).json({ mess: error.message });
+        console.error("Lỗi xóa địa chỉ:", error);
+        return res.status(500).json({ mess: error.message });
     }
-  }
-  
+}
+
 // Lấy tất cả đơn hàng
 async function getOrders(req, res) {
     try {
