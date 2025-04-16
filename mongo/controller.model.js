@@ -63,132 +63,138 @@ module.exports = {
 //
 async function createFullOrder(req, res, next) {
     try {
-      // Lấy dữ liệu từ req.body
-      const {
-        name,
-        quantity,
-        img,
-        price,
-        status,
-        payment_status,
-        total,
-        userId,
-        paymentId,
-        addressId,
-        customerName,
-        customerEmail,
-        items  // mảng các sản phẩm, mỗi item có các trường: productId, quantily, price, name
-      } = req.body;
-  
-      if (!items || !Array.isArray(items)) {
-        return res.status(400).json({ message: "items phải là một mảng" });
-      }
-  
-      // 1. Tạo Order
-      const newOrder = new orderModel({
-        name,
-        quantity,
-        img,
-        price,
-        status,
-        payment_status,
-        total,
-        userId,
-        paymentId,
-        addressId,
-        date: new Date(),
-        customerName,
-        customerEmail
-      });
-      const savedOrder = await newOrder.save();
-  
-      // 2. Tạo Order Detail cho từng sản phẩm
-      const createdItems = await Promise.all(
-        items.map(item =>
-          OrderDetail.create({
-            orderId: savedOrder._id,
-            productId: item.productId,
-            quantily: item.quantily,
-            price: item.price,
-            name: item.name
-          })
-        )
-      );
-  
-      // 3. Cập nhật tồn kho cho mỗi sản phẩm
-      await Promise.all(
-        items.map(item =>
-          productModel.findByIdAndUpdate(
-            item.productId,
-            { $inc: { stock: -item.quantily } }
-          )
-        )
-      );
-  
-      // Gộp thông tin order với order detail để gửi email
-      const fullOrder = {
-        ...savedOrder._doc,
-        items: createdItems
-      };
-  
-      // 4. Gửi email thông báo cho khách hàng
-      await notifyCustomer(fullOrder);
-  
-      // Trả về response cho FE
-      return res.status(201).json({
-        message: "Order và order details được tạo thành công, email đã được gửi",
-        order: fullOrder
-      });
+        // Lấy dữ liệu từ req.body
+        const {
+            name,
+            quantity,
+            img,
+            price,
+            status,
+            payment_status,
+            total,
+            userId,
+            paymentId,
+            addressId,
+            customerName,
+            customerEmail,
+            items  // mảng các sản phẩm, mỗi item có các trường: productId, quantily, price, name
+        } = req.body;
+
+        if (!items || !Array.isArray(items)) {
+            return res.status(400).json({ message: "items phải là một mảng" });
+        }
+
+        // 1. Tạo Order
+        const newOrder = new orderModel({
+            name,
+            quantity,
+            img,
+            price,
+            status,
+            payment_status,
+            total,
+            userId,
+            paymentId,
+            addressId,
+            date: new Date(),
+            customerName,
+            customerEmail
+        });
+        const savedOrder = await newOrder.save();
+
+        // 2. Tạo Order Detail cho từng sản phẩm
+        const createdItems = await Promise.all(
+            items.map(item =>
+                OrderDetail.create({
+                    orderId: savedOrder._id,
+                    productId: item.productId,
+                    quantily: item.quantily,
+                    price: item.price,
+                    name: item.name
+                })
+            )
+        );
+
+        // 3. Cập nhật tồn kho cho mỗi sản phẩm
+        await Promise.all(
+            items.map(item =>
+                productModel.findByIdAndUpdate(
+                    item.productId,
+                    { $inc: { stock: -item.quantily } }
+                )
+            )
+        );
+
+        // Gộp thông tin order với order detail để gửi email
+        const fullOrder = {
+            ...savedOrder._doc,
+            items: createdItems
+        };
+
+        // 4. Gửi email thông báo cho khách hàng
+        await notifyCustomer(fullOrder);
+
+        // Trả về response cho FE
+        return res.status(201).json({
+            message: "Order và order details được tạo thành công, email đã được gửi",
+            order: fullOrder
+        });
     } catch (error) {
-      console.error("Lỗi tạo đơn hàng đầy đủ:", error);
-      return res.status(500).json({ message: error.message });
+        console.error("Lỗi tạo đơn hàng đầy đủ:", error);
+        return res.status(500).json({ message: error.message });
     }
-  }
-  
+}
+
 // controllers/shippingController.js
 async function notifyCustomer (order) {
-    // Xây dựng nội dung email theo thông tin đơn hàng
+    // Truy vấn userModel bằng userId từ order
+    const user = await userModel.findById(order.userId);
+    if (!user || !user.email) {
+        throw new Error("Không tìm thấy thông tin email của người dùng.");
+    }
+
+    const customerEmail = user.email;
+    const customerName = user.name;
+    console.log("Sending email to:", customerEmail);
+
+    // Xây dựng nội dung email
     const htmlContent = `
-      <p>Chào ${order.customerName},</p>
+      <p>Chào ${customerName},</p>
       <p>Cảm ơn bạn đã đặt hàng tại Shop của chúng tôi. Dưới đây là thông tin đơn hàng của bạn:</p>
       <p><strong>Mã đơn hàng:</strong> ${order._id}</p>
       <ul>
-        ${order.items
-          .map(
-            (item) => `<li>${item.name} - ${item.quantily} x ${new Intl.NumberFormat('vi-VN', {
-              style: 'currency',
-              currency: 'VND'
-            }).format(item.price)} = ${new Intl.NumberFormat('vi-VN', {
-              style: 'currency',
-              currency: 'VND'
-            }).format(item.price * item.quantily)}</li>`
-          )
-          .join('')}
+        ${order.items.map((item) =>
+        `<li>${item.name} - ${item.quantily} x ${new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(item.price)} = ${new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(item.price * item.quantily)}</li>`
+    ).join('')}
       </ul>
       <p><strong>Tổng tiền:</strong> ${new Intl.NumberFormat('vi-VN', {
         style: 'currency',
         currency: 'VND'
-      }).format(order.total)}</p>
+    }).format(order.total)}</p>
       <p>Chúng tôi sẽ nhanh chóng xử lý đơn hàng của bạn và thông báo khi đơn hàng được giao.</p>
-      <p>Trân trọng,<br>Team Shop</p>
+      <p>Trân trọng,</p>
+      <p>Team Shop</p>
     `;
-  
+
     const subject = `Thông báo đơn hàng ${order._id} từ Shop của chúng tôi`;
-  
-    try {
-      const mailPayload = {
-        email: order.customerEmail, // Email của khách hàng
+
+    // Gửi mail qua nodemailer
+    const mailPayload = {
+        email: customerEmail, // sử dụng email truy vấn từ userModel
         subject,
         html: htmlContent
-      };
-  
-      const result = await sendMail(mailPayload);
-      console.log("Notification email sent:", result.messageId);
-    } catch (error) {
-      console.error("Error sending notification email:", error);
-    }
-  };
-  
+    };
+
+    const result = await sendMail(mailPayload);
+    console.log("Notification email sent:", result.messageId);
+};
+
 //lấy thông tin giao hàng 
 async function getRates(req, res) {
     try {
@@ -582,40 +588,40 @@ async function deleteFavorite(req, res) {
 //
 async function confirmPayment(req, res, next) {
     try {
-      // FE gửi trường unified 'responseCode' với các quy ước:
-      // VNPay: "00" khi thành công, Zalopay: "1" khi thành công
-      const { orderId, paymentId, responseCode } = req.body;
-  
-      // Xác định trạng thái thanh toán: thành công nếu responseCode là "00" (VNPay) hoặc "1" (Zalopay)
-      const newPaymentStatus = (responseCode === '00' || responseCode === '1') ? 'success' : 'failed';
-  
-      // Cập nhật Payment theo paymentId
-      const updatedPayment = await paymentModel.findByIdAndUpdate(
-        paymentId,
-        { status: newPaymentStatus },
-        { new: true }
-      );
-  
-      // Quy ước: payment_status của Order: 0: pending, 1: success, 2: failed
-      const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
-  
-      // Cập nhật Order theo orderId và lưu luôn paymentId
-      const updatedOrder = await orderModel.findByIdAndUpdate(
-        orderId,
-        { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
-        { new: true }
-      );
-  
-      return res.status(200).json({
-        message: "Cập nhật trạng thái thanh toán thành công",
-        payment: updatedPayment,
-        order: updatedOrder,
-      });
+        // FE gửi trường unified 'responseCode' với các quy ước:
+        // VNPay: "00" khi thành công, Zalopay: "1" khi thành công
+        const { orderId, paymentId, responseCode } = req.body;
+
+        // Xác định trạng thái thanh toán: thành công nếu responseCode là "00" (VNPay) hoặc "1" (Zalopay)
+        const newPaymentStatus = (responseCode === '00' || responseCode === '1') ? 'success' : 'failed';
+
+        // Cập nhật Payment theo paymentId
+        const updatedPayment = await paymentModel.findByIdAndUpdate(
+            paymentId,
+            { status: newPaymentStatus },
+            { new: true }
+        );
+
+        // Quy ước: payment_status của Order: 0: pending, 1: success, 2: failed
+        const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
+
+        // Cập nhật Order theo orderId và lưu luôn paymentId
+        const updatedOrder = await orderModel.findByIdAndUpdate(
+            orderId,
+            { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
+            { new: true }
+        );
+
+        return res.status(200).json({
+            message: "Cập nhật trạng thái thanh toán thành công",
+            payment: updatedPayment,
+            order: updatedOrder,
+        });
     } catch (error) {
-      console.error("Lỗi cập nhật trạng thái thanh toán:", error);
-      return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
+        console.error("Lỗi cập nhật trạng thái thanh toán:", error);
+        return res.status(500).json({ message: "Lỗi cập nhật trạng thái thanh toán" });
     }
-  }
+}
 
 //lấy post theo id
 // async function to get a post by its id
