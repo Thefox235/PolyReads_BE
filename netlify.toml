@@ -13,9 +13,9 @@
 
 [functions]
   included_files = [
+    "node_modules/crypto-js/**",
     "routes/**",
     "mongo/**",
     "package.json",
-    "package-lock.json",
-    "node_modules/body-parser/**"
+    "package-lock.json"
   ]
