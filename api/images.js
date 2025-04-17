@@ -3,7 +3,7 @@ var router = express.Router();
 const imagesModel = require('../mongo/images.model.js');
 const imagesController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
-const authorizeRole = require("../hepler/authorizeRole");
+const authorizeRole = require("../hepler/authorizeRole.js");
 
 router.get('/',async (req,res)=>{
     try {

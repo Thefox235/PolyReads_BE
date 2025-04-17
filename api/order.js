@@ -1,9 +1,9 @@
 // routes/order.js
 const express = require('express');
 const router = express.Router();
-const orderController = require('../mongo/controller.model');
+const orderController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
-const authorizeRole = require("../hepler/authorizeRole");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
+const authorizeRole = require("../hepler/authorizeRole.js");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 
 // gộp order
 router.post('/complete', orderController.createFullOrder);
