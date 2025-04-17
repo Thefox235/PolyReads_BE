@@ -1,0 +1,6 @@
+[build]
+  functions = "netlify/functions"
+
+[dev]
+  command = "npm start" 
+  port = 3000
