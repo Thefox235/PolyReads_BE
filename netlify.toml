@@ -10,10 +10,11 @@
   from = "/*"
   to = "/.netlify/functions/app"
   status = 200
-
+  
 [functions]
   included_files = [
     "node_modules/crypto-js/**",
+    "node_modules/body-parser/**",
     "routes/**",
     "mongo/**",
     "package.json",
