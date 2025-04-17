@@ -12,8 +12,7 @@
   status = 200
 
 [functions]
-  # Bao gồm toàn bộ mã nguồn từ những thư mục được chỉ định:
-  includedFiles = [
+  included_files = [
     "routes/**",
     "mongo/**",
     "package.json",
