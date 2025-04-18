@@ -15,6 +15,7 @@
   included_files = [
     "node_modules/crypto-js/**",
     "node_modules/body-parser/**",
+    "node_modules/raw-body/**",
     "routes/**",
     "mongo/**",
     "package.json",
