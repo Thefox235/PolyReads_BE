@@ -16,6 +16,7 @@
     "node_modules/crypto-js/**",
     "node_modules/body-parser/**",
     "node_modules/raw-body/**",
+    "node_modules/iconv-lite/**",
     "routes/**",
     "mongo/**",
     "package.json",
