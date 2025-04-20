@@ -29,7 +29,7 @@ router.post('/zalopay/payment', async (req, res) => {
   // Embed_data chứa cách chuyển hướng sau khi thanh toán thành công.
   // FE không cần biết các chi tiết này, backend xử lý theo cấu hình cho sẵn:
   const embed_data = {
-    redirecturl: 'http://localhost:3001/paymentResult?paymentMethod=zalopay', 
+    redirecturl: 'https://poly-reads.vercel.app/paymentResult?paymentMethod=zalopay', 
     blacklistedBins: [],
     whiteListedBins: []  
   };
