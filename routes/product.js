@@ -116,10 +116,7 @@ router.post('/addpro', async (req, res) => {
 //thêm sản phẩm localhost:3000/product/add
 router.post('/add', checktoken, authorizeRole("1"), async (req, res) => {
   try {
-    // {
-    //    productData: { name: "...", price: ... },
-    //    images: [{url: "..."}, {url: "..."}]
-    // }
+    res.setHeader('Access-Control-Allow-Origin', 'https://poly-reads.vercel.app');
     const { productData, images } = req.body;
     const result = await productController.addNewProduct(productData, images);
     return res.status(201).json({ productNew: result });

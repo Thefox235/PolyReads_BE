@@ -56,11 +56,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(cors())//cho phép gọi tới api này 
+// app.use(cors())
 app.use(cors({
-  origin: 'https://poly-reads.vercel.app', // Cho phép frontend của bạn
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Các phương thức được phép
-  credentials: true // Nếu bạn sử dụng cookie hoặc thông tin xác thực
+  origin: ['https://poly-reads.vercel.app', 'http://localhost:3001'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
 }));
 // ket noi database mongodb
 mongoose.connect('mongodb+srv://thanhduyhf2:kirixasu16.5@cluster0.k13gf.mongodb.net/PolyReads?retryWrites=true&w=majority&appName=Cluster0')

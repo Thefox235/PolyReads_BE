@@ -15,6 +15,7 @@ const commentModel = require('./comment.model')
 const { OAuth2Client } = require('google-auth-library');
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const JWT_SECRET = process.env.JWT_SECRET || 'kchi';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET; // sử dụng bí mật riêng cho refresh token
 const googleClient = new OAuth2Client(CLIENT_ID);
 const paymentModel = require('./payment.model');
 const addressModel = require('./address.model');
@@ -146,7 +147,7 @@ async function createFullOrder(req, res, next) {
 }
 
 // controllers/shippingController.js
-async function notifyCustomer (order) {
+async function notifyCustomer(order) {
     // Truy vấn userModel bằng userId từ order
     const user = await userModel.findById(order.userId);
     if (!user || !user.email) {
@@ -2156,45 +2157,43 @@ async function resendOtp(req, res) {
 async function register(req, res) {
     try {
         const { email, googleToken } = req.body;
+
         if (googleToken) {
-            // Đăng ký qua Google sử dụng access token
-            // Thay vì verifyIdToken, gọi API userinfo để lấy thông tin người dùng
+            // Đăng ký qua Google
             const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
                 headers: {
                     'Authorization': `Bearer ${googleToken}`
                 }
             });
+            if (!response.ok) {
+                return res.status(400).json({ mess: "Không thể lấy thông tin người dùng từ Google" });
+            }
             const payload = await response.json();
-            // payload bây giờ chứa email, name, picture,...
 
-            // Kiểm tra xem email đã tồn tại chưa
+            // Kiểm tra xem email đã đăng ký chưa
             const userExists = await userModel.findOne({ email: payload.email });
             if (userExists) {
                 return res.status(400).json({ mess: 'Email đã được đăng ký' });
             }
 
-            // Tạo mật khẩu ngẫu nhiên
+            // Tạo mật khẩu ngẫu nhiên và hash
             const randomPass = Math.random().toString(36).substring(2);
             const hashedPassword = bcrypt.hashSync(randomPass, 10);
 
-            // Xử lý số điện thoại và avatar mặc định
-            const defaultPhone = "000";
-            const defaultAvatarUrl = "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg";
-            const avatarUrl = payload.picture ? payload.picture : defaultAvatarUrl;
-
+            // Tạo user mới
             const newUser = new userModel({
                 _id: new mongoose.Types.ObjectId(),
                 email: payload.email,
                 pass: hashedPassword,
-                name: payload.name,
-                phone: defaultPhone, // gán số mặc định khi Google không cung cấp
-                url_image: avatarUrl,
+                name: payload.name || payload.email.split('@')[0],
+                phone: "000",  // Gán số mặc định vì Google không cung cấp
+                url_image: payload.picture || "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
                 role: '0',
                 is_verified: true
             });
             const savedUser = await newUser.save();
 
-            // Tạo JWT token cho user
+            // Tạo token (Access Token)
             const token = jwt.sign(
                 { _id: savedUser._id, email: savedUser.email, role: savedUser.role },
                 JWT_SECRET,
@@ -2203,28 +2202,29 @@ async function register(req, res) {
             return res.status(200).json({ ...savedUser._doc, token });
         } else {
             // Đăng ký thông thường với OTP
+
+            // Kiểm tra email đã được đăng ký chưa
             const existingUser = await userModel.findOne({ email: req.body.email });
             if (existingUser) {
                 return res.status(400).json({ mess: 'Email đã được đăng ký' });
             }
 
-            // Tạo OTP (ví dụ: mã 6 chữ số)
-            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-            // Kiểm tra trường pass để đảm bảo có giá trị hợp lệ
+            // Kiểm tra trường mật khẩu
             if (!req.body.pass) {
                 return res.status(400).json({ mess: 'Thiếu trường mật khẩu' });
             }
 
-            // Hash mật khẩu
+            // Tạo OTP (6 chữ số)
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
             const hashedPassword = bcrypt.hashSync(req.body.pass, 10);
 
+            // Tạo user mới với trạng thái chưa xác thực
             const newUser = new userModel({
                 _id: new mongoose.Types.ObjectId(),
                 email: req.body.email,
                 pass: hashedPassword,
                 name: req.body.name,
-                phone: req.body.phone, // Đối với đăng ký thông thường, người dùng phải nhập phone
+                phone: req.body.phone,
                 url_image: 'https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg',
                 role: req.body.role || '0',
                 is_verified: false,
@@ -2232,6 +2232,7 @@ async function register(req, res) {
             });
             const savedUser = await newUser.save();
 
+            // Gửi email OTP
             try {
                 await sendMail({
                     email: req.body.email,
@@ -2254,32 +2255,23 @@ async function register(req, res) {
 }
 
 
-/**
- * Hàm đăng nhập (login): Hỗ trợ đăng nhập thông thường và qua Google.
- */
+
 async function login(req, res) {
     try {
         const { googleToken, email, pass } = req.body;
         let user;
+
         if (googleToken) {
-            // Xử lý đăng nhập qua Google sử dụng access token:
-            // Thay vì verifyIdToken, sử dụng endpoint userinfo để lấy thông tin người dùng
+            // Xử lý đăng nhập qua Google
             const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
                 headers: {
-                    'Authorization': `Bearer ${googleToken}`
-                }
+                    'Authorization': `Bearer ${googleToken}`,
+                },
             });
             if (!response.ok) {
                 throw new Error("Không thể lấy thông tin người dùng từ Google");
             }
             const payload = await response.json();
-            // payload sẽ có dạng:
-            // {
-            //   email: "...",
-            //   name: "...",
-            //   picture: "...",
-            //   ... các trường khác
-            // }
 
             // Tìm user dựa trên email trả về từ Google
             user = await userModel.findOne({ email: payload.email });
@@ -2292,7 +2284,7 @@ async function login(req, res) {
                     email: payload.email,
                     pass: hashedPassword,
                     name: payload.name || payload.email.split('@')[0],
-                    phone: "000", // Gán số điện thoại mặc định vì Google không cung cấp
+                    phone: "000",
                     url_image: payload.picture || "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
                     role: '0',
                     is_verified: true,
@@ -2306,15 +2298,36 @@ async function login(req, res) {
             const isMatch = bcrypt.compareSync(pass, user.pass);
             if (!isMatch) throw new Error('Mật khẩu không chính xác');
         }
-        // Tạo JWT cho user
+
+        // Tạo Access Token với thời hạn ngắn (ví dụ 1 giờ)
         const token = jwt.sign(
             { _id: user._id, email: user.email, role: user.role },
             JWT_SECRET,
-            { expiresIn: 3600 }
+            { expiresIn: '1h' }
         );
+
+        // Tạo Refresh Token với thời hạn dài hơn (ví dụ 7 ngày)
+        const refreshToken = jwt.sign(
+            { _id: user._id, email: user.email, role: user.role },
+            JWT_REFRESH_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // Convert user về object và xóa trường mật khẩu
         user = user.toObject();
         delete user.pass;
-        return res.status(200).json({ ...user, token });
+
+        // Option 1: Trả cả accessToken và refreshToken trong response JSON.
+        return res.status(200).json({ ...user, token, refreshToken });
+
+        // Option 2: Lưu refreshToken vào HTTP-only cookie (cách này bảo mật hơn)
+        // res.cookie('refreshToken', refreshToken, {
+        //   httpOnly: true,
+        //   secure: process.env.NODE_ENV === 'production',  // Sử dụng HTTPS nếu đang production
+        //   sameSite: 'strict',
+        //   maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ngày
+        // });
+        // return res.status(200).json({ ...user, token });
     } catch (error) {
         console.error("Lỗi đăng nhập:", error);
         return res.status(500).json({ mess: error.message });
