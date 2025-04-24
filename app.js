@@ -22,6 +22,7 @@ require('./mongo/order_detail.model');
 require('./mongo/comment.model');
 require('./mongo/publisher.model');
 require('./mongo/favorite.model');
+require('./mongo/coupon.model');
 
 
 var indexRouter = require('./routes/index');
@@ -43,7 +44,7 @@ var publisherRouter = require('./routes/publisher');
 var discountApplyRoutes = require('./routes/discountApplyRoutes');
 var favoriteRouter = require('./routes/favorite');
 var shippingRouter = require('./routes/shipping');
-
+var couponRouter = require('./routes/coupon');
 
 var app = express();
 
@@ -85,7 +86,7 @@ app.use ('/comment',commentRouter);
 app.use ('/publisher',publisherRouter);
 app.use ('/favorite',favoriteRouter);
 app.use ('/shipping',shippingRouter);
-
+app.use('/coupon',couponRouter);
 
 // app.use('/', indexRouter);
 // app.use('/users', usersRouter);
