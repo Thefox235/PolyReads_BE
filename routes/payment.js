@@ -385,8 +385,8 @@ router.post('/create-vnpay', function (req, res, next) {
   res.json({ paymentUrl: vnpUrl });
 }
 catch (error) {
-  console.error("Error in VNPay route:", error);
-  res.status(500).json({ message: "Error creating VNPay URL" }); // Trả về 
+  console.error("Error creating VNPay URL:", error);
+  res.status(500).json({ message: "Error creating VNPay URL", details: error.message });
 }
 });
 
