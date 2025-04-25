@@ -31,7 +31,7 @@ require('dotenv').config();
 const qs = require("qs");
 const moment = require("moment");
 const order_detailModel = require('./order_detail.model')
-
+const couponModel = require('./coupon.model'); // đảm bảo đường dẫn đúng với file định nghĩa schema coupon
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
@@ -58,9 +58,151 @@ module.exports = {
     getAllFavorites, getProByCataPage, getProductsFilter, getProductSearch,
     calculateShippingFee, getWards, getDistricts, getProvinces, getCities,
     getWardsByDistrict, getDistrictsByCity, getRates, notifyCustomer,
-    createFullOrder
+    createFullOrder, createCoupon, getAllCoupons, getCouponById, updateCoupon,
+    deleteCoupon, bulkUpdateDiscount
 
 }
+async function bulkUpdateDiscount(req, res) {
+    try {
+      const { discountPercentage, startDate, endDate, filter } = req.body;
+      
+      if (discountPercentage === undefined || !filter) {
+        return res.status(400).json({ message: "Thiếu discountPercentage hoặc filter" });
+      }
+      
+      // Tạo discount document với dữ liệu nhận được
+      const discountData = {
+        value: discountPercentage,
+        start_date: startDate ? new Date(startDate) : new Date(),
+        end_date: endDate ? new Date(endDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+        is_active: true
+      };
+      
+      const discount = new discountModel(discountData);
+      await discount.save();
+      
+      // Bulk update: gán trường discount của các sản phẩm thỏa mãn filter bằng _id của discount vừa tạo
+      const result = await productModel.updateMany(filter, { discount: discount._id });
+      
+      res.status(200).json({
+        message: "Bulk discount update successful",
+        discount,
+        result
+      });
+    } catch (error) {
+      console.error("Error during bulk discount update:", error);
+      res.status(500).json({ message: "Error updating products", error });
+    }
+  }
+  
+// Tạo mới coupon (mã giảm giá)
+async function createCoupon(req, res) {
+  try {
+    const {
+      discountPercentage,
+      couponType,       // 'order' hoặc 'shipping'
+      description,
+      validFrom,
+      validUntil,
+      usageLimit,
+      minimumOrderValue,
+      isActive
+    } = req.body;
+
+    const coupon = new couponModel({
+      discountPercentage,
+      couponType,
+      description,
+      validFrom,
+      validUntil,
+      usageLimit,
+      minimumOrderValue,
+      isActive
+    });
+    await coupon.save();
+    res.status(201).json({
+      message: "Coupon created successfully",
+      coupon
+    });
+  } catch (error) {
+    console.error("Error creating coupon:", error);
+    res.status(500).json({ message: "Error creating coupon", error });
+  }
+}
+
+// Lấy danh sách coupon
+async function getAllCoupons(req, res) {
+  try {
+    const coupons = await couponModel.find({});
+    res.status(200).json({ coupons });
+  } catch (error) {
+    console.error("Error fetching coupons:", error);
+    res.status(500).json({ message: "Error fetching coupons", error });
+  }
+}
+
+// Lấy coupon theo id
+async function getCouponById(req, res) {
+  try {
+    const { id } = req.params;
+    const coupon = await couponModel.findById(id);
+    if (!coupon) {
+      return res.status(404).json({ message: "Coupon not found" });
+    }
+    res.status(200).json({ coupon });
+  } catch (error) {
+    console.error("Error fetching coupon:", error);
+    res.status(500).json({ message: "Error fetching coupon", error });
+  }
+}
+
+// Cập nhật coupon theo id
+async function updateCoupon(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      discountPercentage,
+      couponType,
+      description,
+      validFrom,
+      validUntil,
+      usageLimit,
+      minimumOrderValue,
+      isActive
+    } = req.body;
+    const coupon = await couponModel.findByIdAndUpdate(
+      id,
+      { discountPercentage, couponType, description, validFrom, validUntil, usageLimit, minimumOrderValue, isActive },
+      { new: true }
+    );
+    if (!coupon) {
+      return res.status(404).json({ message: "Coupon not found" });
+    }
+    res.status(200).json({
+      message: "Coupon updated successfully",
+      coupon
+    });
+  } catch (error) {
+    console.error("Error updating coupon:", error);
+    res.status(500).json({ message: "Error updating coupon", error });
+  }
+}
+
+// Xóa coupon theo id
+async function deleteCoupon(req, res) {
+  try {
+    const { id } = req.params;
+    const coupon = await couponModel.findByIdAndDelete(id);
+    if (!coupon) {
+      return res.status(404).json({ message: "Coupon not found" });
+    }
+    res.status(200).json({ message: "Coupon deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting coupon:", error);
+    res.status(500).json({ message: "Error deleting coupon", error });
+  }
+}
+
 //
 async function createFullOrder(req, res, next) {
     try {

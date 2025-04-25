@@ -5,8 +5,10 @@ const discountController = require('../mongo/controller.model.js');
 const checktoken = require('../hepler/checktoken.js');
 const authorizeRole = require("../hepler/authorizeRole.js");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 
+router.put('/bulk-update/discount', checktoken, authorizeRole("1"), discountController.bulkUpdateDiscount );
+
 // Tạo mới discount
-router.post('/', discountController.createDiscount);
+router.post('/', checktoken, authorizeRole("1"), discountController.createDiscount);
 
 // Lấy danh sách discount
 router.get('/', discountController.getAllDiscounts);
@@ -15,9 +17,9 @@ router.get('/', discountController.getAllDiscounts);
 router.get('/:id', discountController.getDiscountById);
 
 // Cập nhật discount theo id
-router.put('/:id', discountController.updateDiscount);
+router.put('/:id',  checktoken, authorizeRole("1"), discountController.updateDiscount);
 
 // Xóa discount theo id
-router.delete('/:id', discountController.deleteDiscount);
+router.delete('/:id', checktoken, authorizeRole("1"), discountController.deleteDiscount);
 
 module.exports = router;

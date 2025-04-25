@@ -1,23 +1,24 @@
-var express = require('express');
-var router = express.Router();
-const discountModel = require('../mongo/discount.model.js');
-const discountController = require('../mongo/controller.model.js');
+// routes/couponRoutes.js
+const express = require('express');
+const router = express.Router();
+const couponController = require('../mongo/controller.model');
 const checktoken = require('../hepler/checktoken.js');
 const authorizeRole = require("../hepler/authorizeRole.js");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 
-// Tạo mới discount
-router.post('/', discountController.createDiscount);
 
-// Lấy danh sách discount
-router.get('/', discountController.getAllDiscounts);
+// Tạo mới coupon (chỉ admin mới được tạo)
+router.post('/', checktoken, authorizeRole("1"), couponController.createCoupon);
 
-// Lấy discount theo id
-router.get('/:id', discountController.getDiscountById);
+// Lấy danh sách coupon (có thể công khai)
+router.get('/', couponController.getAllCoupons);
 
-// Cập nhật discount theo id
-router.put('/:id', discountController.updateDiscount);
+// Lấy coupon theo ID
+router.get('/:id', couponController.getCouponById);
 
-// Xóa discount theo id
-router.delete('/:id', discountController.deleteDiscount);
+// Cập nhật coupon theo ID (admin)
+router.put('/:id', checktoken, authorizeRole("1"), couponController.updateCoupon);
+
+// Xóa coupon theo ID (admin)
+router.delete('/:id', checktoken, authorizeRole("1"), couponController.deleteCoupon);
 
 module.exports = router;
