@@ -318,6 +318,9 @@ function convertMongoIdToVnpTxnRef(mongoId) {
 }
 
 router.post('/create-vnpay', function (req, res, next) {
+
+  try {
+
   process.env.TZ = 'Asia/Ho_Chi_Minh';
   let date = new Date();
   let createDate = moment(date).format('YYYYMMDDHHmmss');
@@ -376,6 +379,11 @@ router.post('/create-vnpay', function (req, res, next) {
 
   // Trả về JSON với key "paymentUrl"
   res.json({ paymentUrl: vnpUrl });
+}
+catch (error) {
+  console.error("Error in VNPay route:", error);
+  res.status(500).json({ message: "Error creating VNPay URL" }); // Trả về 
+}
 });
 
 router.get('/vnpay_ipn', function (req, res, next) {
