@@ -378,6 +378,7 @@ router.post('/create-vnpay', function (req, res, next) {
   vnpUrl += '?' + querystring.stringify(vnp_Params, { encode: false });
 
   // Trả về JSON với key "paymentUrl"
+  console.log({ tmnCode, secretKey, vnpUrl, returnUrl });
   res.json({ paymentUrl: vnpUrl });
 }
 catch (error) {
