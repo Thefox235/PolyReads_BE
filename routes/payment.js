@@ -10,11 +10,17 @@ const axios = require('axios').default;
 const CryptoJS = require('crypto-js');
 const dotenv = require('dotenv');
 
-let VNP_TMN_CODE = process.env.vnp_TmnCode || "5IVE3QI3";
-let VNP_HASH_SECRET = process.env.vnp_HashSecret || "4E27C80SH223IRY4LDTGZN11I0AUP3M3";
-let VNP_PAY_URL = process.env.vnp_Url || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-let VNP_API = process.env.vnp_Api || "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
-let VNP_RETURN_URL = process.env.vnp_ReturnUrl || "https://poly-reads.vercel.app/vnpay_return";
+// const VNP_TMN_CODE = process.env.vnp_TmnCode || "5IVE3QI3";
+// const VNP_HASH_SECRET = process.env.vnp_HashSecret || "4E27C80SH223IRY4LDTGZN11I0AUP3M3";
+// const VNP_PAY_URL = process.env.vnp_Url || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+// const VNP_API = process.env.vnp_Api || "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
+// const VNP_RETURN_URL = process.env.vnp_ReturnUrl || "https://poly-reads.vercel.app/vnpay_return";
+
+const VNP_TMN_CODE = "5IVE3QI3";
+const VNP_HASH_SECRET =  "4E27C80SH223IRY4LDTGZN11I0AUP3M3";
+const VNP_PAY_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+const VNP_API = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
+const VNP_RETURN_URL = "https://poly-reads.vercel.app/vnpay_return";
 
 // Cấu hình ứng dụng (sandbox)
 const config = {
