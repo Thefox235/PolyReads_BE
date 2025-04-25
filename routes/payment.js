@@ -8,6 +8,13 @@ const bodyParser = require('body-parser');
 const qs = require('qs');
 const axios = require('axios').default;
 const CryptoJS = require('crypto-js');
+const dotenv = require('dotenv');
+
+let VNP_TMN_CODE = process.env.vnp_TmnCode || "5IVE3QI3";
+let VNP_HASH_SECRET = process.env.vnp_HashSecret || "4E27C80SH223IRY4LDTGZN11I0AUP3M3";
+let VNP_PAY_URL = process.env.vnp_Url || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+let VNP_API = process.env.vnp_Api || "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
+let VNP_RETURN_URL = process.env.vnp_ReturnUrl || "https://poly-reads.vercel.app/vnpay_return";
 
 // Cấu hình ứng dụng (sandbox)
 const config = {
@@ -220,7 +227,7 @@ router.post('/verify', (req, res, next) => {
   let signData = qs.stringify(vnp_Params, { encode: false });
 
   // Tính chữ ký HMAC SHA512 với secretKey
-  let secretKey = config.get('vnp_HashSecret');
+  let secretKey = VNP_HASH_SECRET;
   let computedHash = crypto.createHmac("sha512", secretKey)
     .update(Buffer.from(signData, 'utf-8'))
     .digest('hex');
@@ -321,11 +328,11 @@ router.post('/create-vnpay', function (req, res, next) {
     req.connection.socket?.remoteAddress;
 
   let config = require('config');
-  let tmnCode = process.env.vnp_TmnCode;
-  let secretKey = process.env.vnp_HashSecret;
-  let vnpUrl = process.env.vnp_Url;
-  let vnpApi = process.env.vnp_Api;
-  let returnUrl = process.env.vnp_ReturnUrl;
+  let tmnCode = VNP_TMN_CODE;
+  let secretKey = VNP_HASH_SECRET;
+  let vnpUrl = VNP_PAY_URL;
+  let vnpApi = VNP_API;
+  let returnUrl = VNP_RETURN_URL;
 
   // Lấy các giá trị cần thiết từ FE
   let rawOrderId = req.body.orderId;
@@ -380,7 +387,7 @@ router.get('/vnpay_ipn', function (req, res, next) {
   delete vnp_Params['vnp_SecureHashType'];
   vnp_Params = sortObject(vnp_Params);
   let config = require('config');
-  let secretKey = config.get('vnp_HashSecret');
+  let secretKey = VNP_HASH_SECRET;
   let querystring = require('qs');
   let signData = querystring.stringify(vnp_Params, { encode: false });
   let crypto = require("crypto");
@@ -429,9 +436,9 @@ router.post('/querydr', function (req, res, next) {
   let date = new Date();
   let config = require('config');
   let crypto = require("crypto");
-  let vnp_TmnCode = config.get('vnp_TmnCode');
-  let secretKey = config.get('vnp_HashSecret');
-  let vnp_Api = config.get('vnp_Api');
+  let vnp_TmnCode = VNP_TMN_CODE;
+  let secretKey = VNP_HASH_SECRET;
+  let vnp_Api = VNP_API;
   let vnp_TxnRef = req.body.orderId;
   let vnp_TransactionDate = req.body.transDate;
   let vnp_RequestId = moment(date).format('HHmmss');
@@ -482,9 +489,9 @@ router.post('/refund', function (req, res, next) {
   let config = require('config');
   let crypto = require("crypto");
 
-  let vnp_TmnCode = config.get('vnp_TmnCode');
-  let secretKey = config.get('vnp_HashSecret');
-  let vnp_Api = config.get('vnp_Api');
+  let vnp_TmnCode = VNP_TMN_CODE;
+  let secretKey = VNP_HASH_SECRET;
+  let vnp_Api = VNP_API;
 
   let vnp_TxnRef = req.body.orderId;
   let vnp_TransactionDate = req.body.transDate;
