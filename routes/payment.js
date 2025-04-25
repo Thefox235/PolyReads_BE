@@ -331,10 +331,7 @@ router.post('/create-vnpay', function (req, res, next) {
   let date = new Date();
   let createDate = moment(date).format('YYYYMMDDHHmmss');
 
-  let ipAddr = req.headers['x-forwarded-for'] ||
-    req.connection.remoteAddress ||
-    req.socket.remoteAddress ||
-    req.connection.socket?.remoteAddress;
+  const ipAddr = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
   let config = require('config');
   let tmnCode = VNP_TMN_CODE;
