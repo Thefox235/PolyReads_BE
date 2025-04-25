@@ -282,7 +282,7 @@ router.get('/vnpay_return', (req, res, next) => {
   let signData = querystring.stringify(vnp_Params, { encode: false });
 
   let crypto = require("crypto");
-  let secretKey = require('config').get('vnp_HashSecret');
+  let secretKey = VNP_HASH_SECRET;
   let hmac = crypto.createHmac("sha512", secretKey);
   let signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
 
@@ -333,7 +333,7 @@ router.post('/create-vnpay', function (req, res, next) {
 
   const ipAddr = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
-  let config = require('config');
+  // let config = require('config');
   let tmnCode = VNP_TMN_CODE;
   let secretKey = VNP_HASH_SECRET;
   let vnpUrl = VNP_PAY_URL;
@@ -398,7 +398,7 @@ router.get('/vnpay_ipn', function (req, res, next) {
   delete vnp_Params['vnp_SecureHash'];
   delete vnp_Params['vnp_SecureHashType'];
   vnp_Params = sortObject(vnp_Params);
-  let config = require('config');
+  // let config = require('config');
   let secretKey = VNP_HASH_SECRET;
   let querystring = require('qs');
   let signData = querystring.stringify(vnp_Params, { encode: false });
@@ -446,7 +446,7 @@ router.get('/vnpay_ipn', function (req, res, next) {
 router.post('/querydr', function (req, res, next) {
   process.env.TZ = 'Asia/Ho_Chi_Minh';
   let date = new Date();
-  let config = require('config');
+  // let config = require('config');
   let crypto = require("crypto");
   let vnp_TmnCode = VNP_TMN_CODE;
   let secretKey = VNP_HASH_SECRET;
@@ -498,7 +498,7 @@ router.post('/refund', function (req, res, next) {
   process.env.TZ = 'Asia/Ho_Chi_Minh';
   let date = new Date();
 
-  let config = require('config');
+  // let config = require('config');
   let crypto = require("crypto");
 
   let vnp_TmnCode = VNP_TMN_CODE;
