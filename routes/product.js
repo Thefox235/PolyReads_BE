@@ -17,7 +17,8 @@ router.get('/filter-publishers', async (req, res) => {
     const publisherIds = await productModel.distinct('publisher', filter);
 
     const publisherModel = require('../mongo/publisher.model.js');
-    const publishers = await publisherModel.find({ _id: { $in: publisherIds } });
+    // Sắp xếp theo _id giảm dần (newest first)
+    const publishers = await publisherModel.find({ _id: { $in: publisherIds } }).sort({ _id: -1 });
     return res.status(200).json({ publishers });
   } catch (error) {
     console.error('Lỗi khi lấy nhà xuất bản theo category:', error);
@@ -35,9 +36,9 @@ router.get('/filter-authors', async (req, res) => {
     // Lấy danh sách các tác giả duy nhất mà có sản phẩm thỏa mãn filter
     const authorIds = await productModel.distinct('author', filter);
 
-    // Giả sử có model author được require
     const authorModel = require('../mongo/author.model.js');
-    const authors = await authorModel.find({ _id: { $in: authorIds } });
+    // Sắp xếp theo _id giảm dần (tác giả mới nhất first)
+    const authors = await authorModel.find({ _id: { $in: authorIds } }).sort({ _id: -1 });
     return res.status(200).json({ authors });
   } catch (error) {
     console.error('Lỗi khi lấy tác giả theo category:', error);
@@ -54,20 +55,23 @@ router.get('/filter', async (req, res) => {
       filter.category = new mongoose.Types.ObjectId(category);
     }
     if (author) {
-      // Nếu nhận được chuỗi "author" có nhiều id được phân cách bởi dấu phẩy, tách nó thành mảng
+      // Tách thành mảng các id nếu có dạng chuỗi phân cách bởi dấu phẩy
       const authorIds = author.split(",").map(id => new mongoose.Types.ObjectId(id));
-      filter.author = { $in: authorIds }; // Sử dụng toán tử $in
+      filter.author = { $in: authorIds };
     }
     if (publisher) {
       const publisherIds = publisher.split(",").map(id => new mongoose.Types.ObjectId(id));
       filter.publisher = { $in: publisherIds };
     }
-    // Thực hiện phân trang:
+    
+    // Xác định phân trang
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skipNum = (pageNum - 1) * limitNum;
-
+    
+    // Thực hiện truy vấn với sắp xếp theo _id giảm dần.
     const products = await productModel.find(filter)
+      .sort({ _id: -1 })
       .skip(skipNum)
       .limit(limitNum)
       .populate('author')
