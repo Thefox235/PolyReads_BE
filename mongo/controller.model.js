@@ -2801,7 +2801,7 @@ async function getByKey(key, value) {
         }));
 
         // Nếu bạn muốn giống filter route hoàn toàn, có thể bọc kết quả trong object với key là 'products'
-        return { products: results };
+        return results;
     } catch (error) {
         console.error("Error in getByKey:", error);
         throw error;
