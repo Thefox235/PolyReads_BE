@@ -2770,14 +2770,16 @@ async function getNewPro() {
 }
 async function getByKey(key, value) {
     try {
-        // Tạo regex để khớp các chuỗi bắt đầu bằng 'value' (không phân biệt chữ hoa chữ thường)
+        // Tạo regex khớp với chuỗi 'value' không phân biệt chữ hoa, chữ thường  
         const regex = new RegExp(value, 'i');
 
-        // Tìm kiếm sản phẩm với điều kiện khớp prefix mà không dùng projection nào,
-        // do đó đầy đủ thông tin được trả về
-        let results = await productModel.find({ [key]: regex });
+        // Tìm kiếm sản phẩm theo key với regex và gọi populate cho các trường liên quan  
+        let results = await productModel.find({ [key]: regex })
+            .populate('author')
+            .populate('publisher')
+            .populate('category');
 
-        // Mapping kết quả theo định dạng mong muốn với các tên trường tiếng Anh
+        // Nếu bạn muốn đảm bảo trả về các trường nhất định giống như filter route, bạn có thể mapping lại:
         results = results.map(result => ({
             _id: result._id,
             name: result.name,
@@ -2798,9 +2800,11 @@ async function getByKey(key, value) {
             discount: result.discount
         }));
 
-        return results;
+        // Nếu bạn muốn giống filter route hoàn toàn, có thể bọc kết quả trong object với key là 'products'
+        return { products: results };
     } catch (error) {
         console.error("Error in getByKey:", error);
+        throw error;
     }
 }
 async function updateCateById(id, body) {
