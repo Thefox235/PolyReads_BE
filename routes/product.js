@@ -55,7 +55,6 @@ router.get('/filter', async (req, res) => {
       filter.category = new mongoose.Types.ObjectId(category);
     }
     if (author) {
-      // Tách thành mảng các id nếu có dạng chuỗi phân cách bởi dấu phẩy
       const authorIds = author.split(",").map(id => new mongoose.Types.ObjectId(id));
       filter.author = { $in: authorIds };
     }
@@ -64,12 +63,13 @@ router.get('/filter', async (req, res) => {
       filter.publisher = { $in: publisherIds };
     }
     
-    // Xác định phân trang
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skipNum = (pageNum - 1) * limitNum;
     
-    // Thực hiện truy vấn với sắp xếp theo _id giảm dần.
+    // Lấy tổng số sản phẩm dựa theo filter
+    const total = await productModel.countDocuments(filter);
+    
     const products = await productModel.find(filter)
       .sort({ _id: -1 })
       .skip(skipNum)
@@ -77,8 +77,8 @@ router.get('/filter', async (req, res) => {
       .populate('author')
       .populate('publisher')
       .populate('category');
-
-    return res.status(200).json({ products });
+      
+    return res.status(200).json({ total, products });
   } catch (error) {
     console.error("Error in product filter:", error);
     return res.status(500).json({ message: error.message });
