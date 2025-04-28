@@ -64,143 +64,143 @@ module.exports = {
 }
 async function bulkUpdateDiscount(req, res) {
     try {
-      const { discountPercentage, startDate, endDate, filter } = req.body;
-      
-      if (discountPercentage === undefined || !filter) {
-        return res.status(400).json({ message: "Thiếu discountPercentage hoặc filter" });
-      }
-      
-      // Tạo discount document với dữ liệu nhận được
-      const discountData = {
-        value: discountPercentage,
-        start_date: startDate ? new Date(startDate) : new Date(),
-        end_date: endDate ? new Date(endDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
-        is_active: true
-      };
-      
-      const discount = new discountModel(discountData);
-      await discount.save();
-      
-      // Bulk update: gán trường discount của các sản phẩm thỏa mãn filter bằng _id của discount vừa tạo
-      const result = await productModel.updateMany(filter, { discount: discount._id });
-      
-      res.status(200).json({
-        message: "Bulk discount update successful",
-        discount,
-        result
-      });
+        const { discountPercentage, startDate, endDate, filter } = req.body;
+
+        if (discountPercentage === undefined || !filter) {
+            return res.status(400).json({ message: "Thiếu discountPercentage hoặc filter" });
+        }
+
+        // Tạo discount document với dữ liệu nhận được
+        const discountData = {
+            value: discountPercentage,
+            start_date: startDate ? new Date(startDate) : new Date(),
+            end_date: endDate ? new Date(endDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+            is_active: true
+        };
+
+        const discount = new discountModel(discountData);
+        await discount.save();
+
+        // Bulk update: gán trường discount của các sản phẩm thỏa mãn filter bằng _id của discount vừa tạo
+        const result = await productModel.updateMany(filter, { discount: discount._id });
+
+        res.status(200).json({
+            message: "Bulk discount update successful",
+            discount,
+            result
+        });
     } catch (error) {
-      console.error("Error during bulk discount update:", error);
-      res.status(500).json({ message: "Error updating products", error });
+        console.error("Error during bulk discount update:", error);
+        res.status(500).json({ message: "Error updating products", error });
     }
-  }
-  
+}
+
 // Tạo mới coupon (mã giảm giá)
 async function createCoupon(req, res) {
-  try {
-    const {
-      discountPercentage,
-      couponType,       // 'order' hoặc 'shipping'
-      description,
-      validFrom,
-      validUntil,
-      usageLimit,
-      minimumOrderValue,
-      isActive
-    } = req.body;
+    try {
+        const {
+            discountPercentage,
+            couponType,       // 'order' hoặc 'shipping'
+            description,
+            validFrom,
+            validUntil,
+            usageLimit,
+            minimumOrderValue,
+            isActive
+        } = req.body;
 
-    const coupon = new couponModel({
-      discountPercentage,
-      couponType,
-      description,
-      validFrom,
-      validUntil,
-      usageLimit,
-      minimumOrderValue,
-      isActive
-    });
-    await coupon.save();
-    res.status(201).json({
-      message: "Coupon created successfully",
-      coupon
-    });
-  } catch (error) {
-    console.error("Error creating coupon:", error);
-    res.status(500).json({ message: "Error creating coupon", error });
-  }
+        const coupon = new couponModel({
+            discountPercentage,
+            couponType,
+            description,
+            validFrom,
+            validUntil,
+            usageLimit,
+            minimumOrderValue,
+            isActive
+        });
+        await coupon.save();
+        res.status(201).json({
+            message: "Coupon created successfully",
+            coupon
+        });
+    } catch (error) {
+        console.error("Error creating coupon:", error);
+        res.status(500).json({ message: "Error creating coupon", error });
+    }
 }
 
 // Lấy danh sách coupon
 async function getAllCoupons(req, res) {
-  try {
-    const coupons = await couponModel.find({});
-    res.status(200).json({ coupons });
-  } catch (error) {
-    console.error("Error fetching coupons:", error);
-    res.status(500).json({ message: "Error fetching coupons", error });
-  }
+    try {
+        const coupons = await couponModel.find({});
+        res.status(200).json({ coupons });
+    } catch (error) {
+        console.error("Error fetching coupons:", error);
+        res.status(500).json({ message: "Error fetching coupons", error });
+    }
 }
 
 // Lấy coupon theo id
 async function getCouponById(req, res) {
-  try {
-    const { id } = req.params;
-    const coupon = await couponModel.findById(id);
-    if (!coupon) {
-      return res.status(404).json({ message: "Coupon not found" });
+    try {
+        const { id } = req.params;
+        const coupon = await couponModel.findById(id);
+        if (!coupon) {
+            return res.status(404).json({ message: "Coupon not found" });
+        }
+        res.status(200).json({ coupon });
+    } catch (error) {
+        console.error("Error fetching coupon:", error);
+        res.status(500).json({ message: "Error fetching coupon", error });
     }
-    res.status(200).json({ coupon });
-  } catch (error) {
-    console.error("Error fetching coupon:", error);
-    res.status(500).json({ message: "Error fetching coupon", error });
-  }
 }
 
 // Cập nhật coupon theo id
 async function updateCoupon(req, res) {
-  try {
-    const { id } = req.params;
-    const {
-      discountPercentage,
-      couponType,
-      description,
-      validFrom,
-      validUntil,
-      usageLimit,
-      minimumOrderValue,
-      isActive
-    } = req.body;
-    const coupon = await couponModel.findByIdAndUpdate(
-      id,
-      { discountPercentage, couponType, description, validFrom, validUntil, usageLimit, minimumOrderValue, isActive },
-      { new: true }
-    );
-    if (!coupon) {
-      return res.status(404).json({ message: "Coupon not found" });
+    try {
+        const { id } = req.params;
+        const {
+            discountPercentage,
+            couponType,
+            description,
+            validFrom,
+            validUntil,
+            usageLimit,
+            minimumOrderValue,
+            isActive
+        } = req.body;
+        const coupon = await couponModel.findByIdAndUpdate(
+            id,
+            { discountPercentage, couponType, description, validFrom, validUntil, usageLimit, minimumOrderValue, isActive },
+            { new: true }
+        );
+        if (!coupon) {
+            return res.status(404).json({ message: "Coupon not found" });
+        }
+        res.status(200).json({
+            message: "Coupon updated successfully",
+            coupon
+        });
+    } catch (error) {
+        console.error("Error updating coupon:", error);
+        res.status(500).json({ message: "Error updating coupon", error });
     }
-    res.status(200).json({
-      message: "Coupon updated successfully",
-      coupon
-    });
-  } catch (error) {
-    console.error("Error updating coupon:", error);
-    res.status(500).json({ message: "Error updating coupon", error });
-  }
 }
 
 // Xóa coupon theo id
 async function deleteCoupon(req, res) {
-  try {
-    const { id } = req.params;
-    const coupon = await couponModel.findByIdAndDelete(id);
-    if (!coupon) {
-      return res.status(404).json({ message: "Coupon not found" });
+    try {
+        const { id } = req.params;
+        const coupon = await couponModel.findByIdAndDelete(id);
+        if (!coupon) {
+            return res.status(404).json({ message: "Coupon not found" });
+        }
+        res.status(200).json({ message: "Coupon deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting coupon:", error);
+        res.status(500).json({ message: "Error deleting coupon", error });
     }
-    res.status(200).json({ message: "Coupon deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting coupon:", error);
-    res.status(500).json({ message: "Error deleting coupon", error });
-  }
 }
 
 //
@@ -1957,12 +1957,12 @@ async function updateById(productId, productData, images) {
 }
 //thêm sản phẩm và hình ảnh
 async function addNewProduct(productData, images) {
-    // Tạo một session mới
+    // Tạo một session mới cho giao dịch
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        // Bước 1: Tạo sản phẩm mới trong collection Product.
+        // Giải nén các trường từ productData
         const {
             name,
             title,
@@ -1977,27 +1977,37 @@ async function addNewProduct(productData, images) {
             published_date,
             publisher,
             sale_count,
-            category,  // Đây là id của Category
-            author,    // Đây là id của Author
-            discount   // Đây là id của Discount
+            category, // id của Category
+            author,   // id của Author
+            discount  // id của Discount
         } = productData;
-        // Kiểm tra xem Category có tồn tại không
+
+        // Kiểm tra trùng lặp: nếu có sản phẩm với cùng tên (có thể điều chỉnh để không phân biệt chữ hoa chữ thường)
+        const existingProduct = await productModel.findOne({ name: name });
+        if (existingProduct) {
+            // Nếu tìm thấy, ném lỗi và thông báo
+            throw new Error("Sản phẩm với tên này đã tồn tại");
+        }
+
+        // Kiểm tra sự tồn tại của Category
         const categoryFind = await categoryModel.findById(category);
         if (!categoryFind) {
-            throw new Error('Không tìm thấy category', categoryFind);
+            throw new Error("Không tìm thấy category");
         }
 
-        // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
+        // Kiểm tra sự tồn tại của Author
         const authorFind = await authorModel.findById(author);
         if (!authorFind) {
-            throw new Error('Không tìm thấy author');
+            throw new Error("Không tìm thấy author");
         }
 
-        // Tương tự, bạn có thể kiểm tra Author và Discount nếu cần
+        // Kiểm tra sự tồn tại của Publisher (Nhà Xuất Bản)
         const publisherFind = await publisherModel.findById(publisher);
         if (!publisherFind) {
-            throw new Error('Không tìm thấy nxb');
+            throw new Error("Không tìm thấy nhà xuất bản");
         }
+
+        // Tạo sản phẩm mới, chỉ cần truyền các id cho category, author, discount, publisher
         const proNew = new productModel({
             name,
             title,
@@ -2011,25 +2021,26 @@ async function addNewProduct(productData, images) {
             format,
             published_date,
             publisher,
-            sale_count: 0,
-            category,  // chỉ cần truyền id
-            author,    // chỉ cần truyền id
-            discount   // chỉ cần truyền id
+            sale_count: 0, // Đặt bán hàng mặc định hoặc cập nhật nếu cần
+            category,
+            author,
+            discount
         });
-        // Nếu hàm insert của bạn hỗ trợ truyền session, hãy dùng:
-        const newProduct = await proNew.save();
-        // console.log(newProduct);
 
-        const productId = newProduct._id; // Lấy _id của sản phẩm mới tạo
+        // Lưu sản phẩm mới với session
+        const newProduct = await proNew.save({ session });
 
-        // Bước 2: Xử lý dữ liệu cho ảnh dựa trên productId vừa tạo
+        // Lấy _id của sản phẩm vừa tạo
+        const productId = newProduct._id;
+
+        // Bước 2: Chuyển các ảnh liên quan vào collection ProductImage
         const imageData = images.map(image => ({
             productId: productId,
             url: image.url,
             // Thêm các trường khác nếu cần
         }));
 
-        // Thêm ảnh vào collection ProductImage cùng với session
+        // Chèn ảnh với session
         await imagesModel.insertMany(imageData, { session });
 
         // Nếu mọi thao tác đều thành công, commit transaction
@@ -2037,15 +2048,15 @@ async function addNewProduct(productData, images) {
         session.endSession();
 
         return newProduct;
-    }
-    catch (error) {
-        // Nếu có lỗi, rollback transaction
+    } catch (error) {
+        // Nếu có lỗi, rollback transaction và kết thúc session
         await session.abortTransaction();
         session.endSession();
         console.error("Error in transaction:", error);
         throw error;
     }
 }
+
 
 //truy vấn images
 async function getImages(body) {
