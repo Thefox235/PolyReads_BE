@@ -1714,14 +1714,25 @@ async function deleteDiscount(req, res) {
 //hàm sửa nxb
 async function updatePublisherById(id, body) {
     try {
+        // Nếu cập nhật trường "name", kiểm tra xem có publisher nào khác đã có tên này chưa
+        if (body.name) {
+            const duplicate = await publisherModel.findOne({
+                name: new RegExp("^" + body.name + "$", "i"), // tìm kiếm không phân biệt chữ hoa thường
+                _id: { $ne: id } // loại trừ chính bản ghi đang update
+            });
+            if (duplicate) {
+                throw new Error("Nhà xuất bản với tên này đã tồn tại");
+            }
+        }
+
         const result = await publisherModel.findByIdAndUpdate(id, body, { new: true });
         if (result) {
             return { message: 'Sửa nxb thành công', data: result };
         } else {
-            throw new Error('Ko tìm thấy nxb');
+            throw new Error('Không tìm thấy nxb');
         }
     } catch (error) {
-        console.error('lỗi sửa nxb:', error);
+        console.error('Lỗi sửa nxb:', error);
         throw error;
     }
 }
@@ -1751,29 +1762,29 @@ async function deletePublisherById(id) {
 //hàm thêm nxb
 async function insertPublisher(body) {
     try {
-      const { name, is_active } = body;
-  
-      // Kiểm tra xem nhà xuất bản với tên này đã tồn tại chưa (không phân biệt chữ hoa/chữ thường)
-      const existingPublisher = await publisherModel.findOne({
-        name: new RegExp("^" + name + "$", "i")
-      });
-      if (existingPublisher) {
-        throw new Error("Nhà xuất bản với tên này đã tồn tại");
-      }
-  
-      // Nếu chưa tồn tại, tạo đối tượng publisher mới
-      const newPublisher = new publisherModel({
-        name,
-        is_active: true // hoặc bạn có thể dùng is_active nếu muốn: is_active
-      });
-  
-      const result = await newPublisher.save();
-      return result;
+        const { name, is_active } = body;
+
+        // Kiểm tra xem nhà xuất bản với tên này đã tồn tại chưa (không phân biệt chữ hoa/chữ thường)
+        const existingPublisher = await publisherModel.findOne({
+            name: new RegExp("^" + name + "$", "i")
+        });
+        if (existingPublisher) {
+            throw new Error("Nhà xuất bản với tên này đã tồn tại");
+        }
+
+        // Nếu chưa tồn tại, tạo đối tượng publisher mới
+        const newPublisher = new publisherModel({
+            name,
+            is_active: true // hoặc bạn có thể dùng is_active nếu muốn: is_active
+        });
+
+        const result = await newPublisher.save();
+        return result;
     } catch (error) {
-      console.log("Lỗi khi thêm nxb:", error);
-      throw error;
+        console.log("Lỗi khi thêm nxb:", error);
+        throw error;
     }
-  }
+}
 //hàm lấy danh sách publisher
 async function getPublisher() {
     try {
@@ -1904,14 +1915,25 @@ async function updateById(productId, productData, images) {
         // Tìm sản phẩm theo productId và sử dụng session
         const product = await productModel.findById(productId).session(session);
         if (!product) {
-            throw new Error('Không tìm thấy sản phẩm');
+            throw new Error("Không tìm thấy sản phẩm");
+        }
+
+        // Nếu cập nhật tên sản phẩm thì kiểm tra trùng lặp (loại trừ chính bản ghi đang update)
+        if (productData.name) {
+            const duplicate = await productModel.findOne({
+                name: new RegExp("^" + productData.name + "$", "i"),
+                _id: { $ne: productId }
+            }).session(session);
+            if (duplicate) {
+                throw new Error("Sản phẩm với tên này đã tồn tại");
+            }
         }
 
         // Nếu có cập nhật cho category, kiểm tra sự tồn tại của category đó
         if (productData.category) {
             const categoryFind = await categoryModel.findById(productData.category).session(session);
             if (!categoryFind) {
-                throw new Error('Không tìm thấy category');
+                throw new Error("Không tìm thấy category");
             }
         }
 
@@ -1919,7 +1941,7 @@ async function updateById(productId, productData, images) {
         if (productData.author) {
             const authorFind = await authorModel.findById(productData.author).session(session);
             if (!authorFind) {
-                throw new Error('Không tìm thấy author');
+                throw new Error("Không tìm thấy author");
             }
         }
 
@@ -1927,7 +1949,7 @@ async function updateById(productId, productData, images) {
         if (productData.discount) {
             const discountFind = await discountModel.findById(productData.discount).session(session);
             if (!discountFind) {
-                throw new Error('Không tìm thấy discount');
+                throw new Error("Không tìm thấy discount");
             }
         }
 
@@ -1939,7 +1961,7 @@ async function updateById(productId, productData, images) {
         );
 
         // Xử lý cập nhật ảnh:
-        // Ta thực hiện xóa hết các ảnh cũ liên quan đến sản phẩm này
+        // Xóa hết các ảnh cũ liên quan đến sản phẩm này
         await imagesModel.deleteMany({ productId }, { session });
 
         // Nếu có hình ảnh mới được truyền vào (mảng images không rỗng)
@@ -1947,8 +1969,9 @@ async function updateById(productId, productData, images) {
             const newImagesData = images.map(image => ({
                 productId,
                 url: image.url,
-                // Thêm các trường khác nếu cần.
+                // Thêm các trường khác nếu cần
             }));
+
             // Chèn các ảnh mới vào collection cùng với session.
             await imagesModel.insertMany(newImagesData, { session });
         }
@@ -1962,7 +1985,7 @@ async function updateById(productId, productData, images) {
         // Nếu gặp lỗi, rollback transaction và ném lỗi ra
         await session.abortTransaction();
         session.endSession();
-        console.error('Error in transaction update:', error);
+        console.error("Error in transaction update:", error);
         throw error;
     }
 }
@@ -2163,14 +2186,25 @@ async function checkEmailExists(email) {
 //hàm sửa tác giả
 async function updateAuthorById(id, body) {
     try {
+        // Nếu có cập nhật tên, kiểm tra xem có tác giả nào khác đã có tên đó chưa
+        if (body.name) {
+            const duplicate = await authorModel.findOne({
+                name: new RegExp("^" + body.name + "$", "i"),
+                _id: { $ne: id } // Loại trừ chính bản ghi đang được cập nhật
+            });
+            if (duplicate) {
+                throw new Error("Author with this name already exists");
+            }
+        }
+
         const result = await authorModel.findByIdAndUpdate(id, body, { new: true });
         if (result) {
-            return { message: 'Brand updated successfully', data: result };
+            return { message: "Author updated successfully", data: result };
         } else {
-            throw new Error('Brand not found');
+            throw new Error("Author not found");
         }
     } catch (error) {
-        console.error('Error updating brand:', error);
+        console.error("Error updating author:", error);
         throw error;
     }
 }
@@ -2210,31 +2244,31 @@ async function getAuthor() {
 //hàm thêm brand
 async function insertAuthor(body) {
     try {
-      const { name, is_active } = body;
-      
-      // Kiểm tra xem tác giả với tên này đã tồn tại hay chưa (không phân biệt chữ hoa/chữ thường)
-      const existingAuthor = await authorModel.findOne({ 
-        name: new RegExp("^" + name + "$", "i") 
-      });
-      
-      if (existingAuthor) {
-        throw new Error("Tác giả với tên này đã tồn tại");
-      }
-      
-      // Nếu chưa tồn tại, tạo đối tượng tác giả mới
-      const newAuthor = new authorModel({
-        name,
-        is_active
-      });
-      
-      // Lưu vào collection tác giả
-      const result = await newAuthor.save();
-      return result;
+        const { name, is_active } = body;
+
+        // Kiểm tra xem tác giả với tên này đã tồn tại hay chưa (không phân biệt chữ hoa/chữ thường)
+        const existingAuthor = await authorModel.findOne({
+            name: new RegExp("^" + name + "$", "i")
+        });
+
+        if (existingAuthor) {
+            throw new Error("Tác giả với tên này đã tồn tại");
+        }
+
+        // Nếu chưa tồn tại, tạo đối tượng tác giả mới
+        const newAuthor = new authorModel({
+            name,
+            is_active
+        });
+
+        // Lưu vào collection tác giả
+        const result = await newAuthor.save();
+        return result;
     } catch (error) {
-      console.log("Lỗi khi thêm tác giả:", error);
-      throw error;
+        console.log("Lỗi khi thêm tác giả:", error);
+        throw error;
     }
-  }
+}
 // Hàm đổi mật khẩu
 async function changePassword(email, oldPassword, newPassword) {
     try {
@@ -2850,11 +2884,26 @@ async function getByKey(key, value) {
 }
 async function updateCateById(id, body) {
     try {
-        const pro = await categoryModel.findById(id);
-        if (!pro) {
-            throw new Error('Không tìm thấy danh mục');
+        // Kiểm tra xem danh mục cần cập nhật có tồn tại không
+        const existingCategory = await categoryModel.findById(id);
+        if (!existingCategory) {
+            throw new Error("Không tìm thấy danh mục");
         }
+
+        // Nếu cập nhật trường 'name', kiểm tra xem có danh mục nào khác đã có tên đó không
+        if (body.name) {
+            const duplicate = await categoryModel.findOne({
+                name: new RegExp("^" + body.name + "$", "i"), // So sánh không phân biệt chữ hoa chữ thường
+                _id: { $ne: id } // Loại trừ bản ghi hiện tại
+            });
+            if (duplicate) {
+                throw new Error("Danh mục với tên này đã tồn tại");
+            }
+        }
+
+        // Lấy các trường cần cập nhật
         const { name, type, is_active } = body;
+        // Update và trả về bản ghi cập nhật (với { new: true } để lấy kết quả mới)
         const result = await categoryModel.findByIdAndUpdate(
             id,
             { name, type, is_active },
@@ -2862,7 +2911,7 @@ async function updateCateById(id, body) {
         );
         return result;
     } catch (error) {
-        console.log('Lỗi update theo id', error);
+        console.log("Lỗi update theo id", error);
         throw error;
     }
 }
