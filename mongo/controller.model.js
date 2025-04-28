@@ -1751,18 +1751,29 @@ async function deletePublisherById(id) {
 //hàm thêm nxb
 async function insertPublisher(body) {
     try {
-        const { name, is_active } = body;
-        const newPublisher = new publisherModel({
-            name,
-            is_active: true
-        });
-        const result = await newPublisher.save();
-        return result;
+      const { name, is_active } = body;
+  
+      // Kiểm tra xem nhà xuất bản với tên này đã tồn tại chưa (không phân biệt chữ hoa/chữ thường)
+      const existingPublisher = await publisherModel.findOne({
+        name: new RegExp("^" + name + "$", "i")
+      });
+      if (existingPublisher) {
+        throw new Error("Nhà xuất bản với tên này đã tồn tại");
+      }
+  
+      // Nếu chưa tồn tại, tạo đối tượng publisher mới
+      const newPublisher = new publisherModel({
+        name,
+        is_active: true // hoặc bạn có thể dùng is_active nếu muốn: is_active
+      });
+  
+      const result = await newPublisher.save();
+      return result;
     } catch (error) {
-        console.log('Lỗi khi thêm nxb:', error);
-        throw error;
+      console.log("Lỗi khi thêm nxb:", error);
+      throw error;
     }
-}
+  }
 //hàm lấy danh sách publisher
 async function getPublisher() {
     try {
@@ -2199,19 +2210,31 @@ async function getAuthor() {
 //hàm thêm brand
 async function insertAuthor(body) {
     try {
-        const { name, bio } = body;
-        const newbrand = new authorModel({
-            name,
-            bio
-        });
-        // Lưu vào collection categories
-        const result = await newbrand.save();
-        return result;
+      const { name, is_active } = body;
+      
+      // Kiểm tra xem tác giả với tên này đã tồn tại hay chưa (không phân biệt chữ hoa/chữ thường)
+      const existingAuthor = await authorModel.findOne({ 
+        name: new RegExp("^" + name + "$", "i") 
+      });
+      
+      if (existingAuthor) {
+        throw new Error("Tác giả với tên này đã tồn tại");
+      }
+      
+      // Nếu chưa tồn tại, tạo đối tượng tác giả mới
+      const newAuthor = new authorModel({
+        name,
+        is_active
+      });
+      
+      // Lưu vào collection tác giả
+      const result = await newAuthor.save();
+      return result;
     } catch (error) {
-        console.log('Lỗi khi thêm tác giả:', error);
-        throw error;
+      console.log("Lỗi khi thêm tác giả:", error);
+      throw error;
     }
-}
+  }
 // Hàm đổi mật khẩu
 async function changePassword(email, oldPassword, newPassword) {
     try {
@@ -2745,6 +2768,13 @@ async function insert(body) {
 async function insertCategory(body) {
     try {
         const { name, type, is_active } = body;
+        // Kiểm tra xem danh mục với tên này đã tồn tại chưa (tìm kiếm không phân biệt chữ hoa chữ thường)
+        const existingCategory = await categoryModel.findOne({ name: new RegExp("^" + name + "$", "i") });
+        if (existingCategory) {
+            // Nếu đã tồn tại, ném lỗi để thông báo cho client
+            throw new Error("Danh mục với tên này đã tồn tại");
+        }
+
         const newCategory = new categoryModel({
             name,
             type,
