@@ -1482,19 +1482,29 @@ async function toggleLike(req, res) {
 //lấy comment
 async function getComments(req, res) {
     try {
-        const { productId } = req.query;  // Lấy productId từ query string
-        const filter = productId ? { productId } : {};
-        // Tùy chọn: populate user và product nếu cần
-        const comments = await commentModel.find(filter)
-            .populate('userId', 'name url_image') 
-            .populate('productId', 'name')  // (tuỳ chọn)
-            .sort({ date: -1 });  // Sắp xếp giảm dần theo ngày tạo
-        res.status(200).json({ comments });
+      const { productId, page = 1, limit = 10 } = req.query; // page và limit mặc định
+      const filter = productId ? { productId } : {};
+  
+      // Tính toán số lượng tài liệu bỏ qua
+      const skip = (Number(page) - 1) * Number(limit);
+  
+      // Lấy tổng số comment cho phân trang (nếu cần)
+      const total = await commentModel.countDocuments(filter);
+  
+      // Query dữ liệu với phân trang
+      const comments = await commentModel.find(filter)
+        .populate('userId', 'name url_image')
+        .populate('productId', 'name')
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(Number(limit));
+  
+      res.status(200).json({ comments, total, page: Number(page), limit: Number(limit) });
     } catch (error) {
-        console.error("Error fetching comments:", error);
-        res.status(500).json({ message: "Error fetching comments", error });
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ message: "Error fetching comments", error });
     }
-};
+  };
 //unlike comment
 async function unlikeComment(req, res) {
     try {
