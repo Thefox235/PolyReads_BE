@@ -1486,7 +1486,7 @@ async function getComments(req, res) {
         const filter = productId ? { productId } : {};
         // Tùy chọn: populate user và product nếu cần
         const comments = await commentModel.find(filter)
-            .populate('userId', 'name', 'url_image')  // Chỉ lấy tên người dùng
+            .populate('userId', 'name url_image') 
             .populate('productId', 'name')  // (tuỳ chọn)
             .sort({ date: -1 });  // Sắp xếp giảm dần theo ngày tạo
         res.status(200).json({ comments });
