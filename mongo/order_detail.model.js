@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 const order_detailSchema = new Schema({
   orderId: { type: Schema.Types.ObjectId, ref: 'order' },
   productId: { type: Schema.Types.ObjectId, ref: 'product' },
-  quantily: { type: Number, required: true },  // Lưu ý: "quantily" (nhầm số lượng) thay vì quantity
+  quantity: { type: Number, required: true },  // đổi từ quantily sang quantity
   price: { type: Number, required: true },
 });
 

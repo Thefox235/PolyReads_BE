@@ -220,7 +220,7 @@ async function createFullOrder(req, res, next) {
             addressId,
             customerName,
             customerEmail,
-            items  // mảng các sản phẩm, mỗi item có các trường: productId, quantily, price, name
+            items  // mảng các sản phẩm, mỗi item có các trường: productId, quantity, price, name
         } = req.body;
 
         if (!items || !Array.isArray(items)) {
@@ -251,7 +251,7 @@ async function createFullOrder(req, res, next) {
                 OrderDetail.create({
                     orderId: savedOrder._id,
                     productId: item.productId,
-                    quantily: item.quantily,
+                    quantity: item.quantity,
                     price: item.price,
                     name: item.name
                 })
@@ -263,7 +263,7 @@ async function createFullOrder(req, res, next) {
             items.map(item =>
                 productModel.findByIdAndUpdate(
                     item.productId,
-                    { $inc: { stock: -item.quantily } }
+                    { $inc: { stock: -item.quantity } }
                 )
             )
         );
@@ -307,13 +307,13 @@ async function notifyCustomer(order) {
       <p><strong>Mã đơn hàng:</strong> ${order._id}</p>
       <ul>
         ${order.items.map((item) =>
-        `<li>${item.name} - ${item.quantily} x ${new Intl.NumberFormat('vi-VN', {
+        `<li>${item.name} - ${item.quantity} x ${new Intl.NumberFormat('vi-VN', {
             style: 'currency',
             currency: 'VND'
         }).format(item.price)} = ${new Intl.NumberFormat('vi-VN', {
             style: 'currency',
             currency: 'VND'
-        }).format(item.price * item.quantily)}</li>`
+        }).format(item.price * item.quantity)}</li>`
     ).join('')}
       </ul>
       <p><strong>Tổng tiền:</strong> ${new Intl.NumberFormat('vi-VN', {
@@ -923,7 +923,7 @@ async function createOrderDetail(req, res) {
                 OrderDetail.create({
                     orderId,
                     productId: item.productId,
-                    quantily: item.quantily, // trường yêu cầu
+                    quantity: item.quantity, // trường yêu cầu
                     price: item.price,
                 })
             )
@@ -934,7 +934,7 @@ async function createOrderDetail(req, res) {
             items.map(item =>
                 productModel.findByIdAndUpdate(
                     item.productId,
-                    { $inc: { stock: -item.quantily } } // Giảm stock đi quantily
+                    { $inc: { stock: -item.quantity } } // Giảm stock đi quantity
                 )
             )
         );
