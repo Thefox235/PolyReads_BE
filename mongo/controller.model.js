@@ -32,6 +32,14 @@ const qs = require("qs");
 const moment = require("moment");
 const order_detailModel = require('./order_detail.model')
 const couponModel = require('./coupon.model'); // đảm bảo đường dẫn đúng với file định nghĩa schema coupon
+const {
+    generateAppTransId,
+    generateZaloPayMac,
+    callZaloPayAPI,
+    callVNPayAPI,
+    createVNPayPaymentURL
+} = require('../hepler/paymentHelper');
+
 module.exports = {
     insert, getAll, updateById,
     getNewPro, getCategory, getUsers, deleteById,
@@ -59,9 +67,85 @@ module.exports = {
     calculateShippingFee, getWards, getDistricts, getProvinces, getCities,
     getWardsByDistrict, getDistrictsByCity, getRates, notifyCustomer,
     createFullOrder, createCoupon, getAllCoupons, getCouponById, updateCoupon,
-    deleteCoupon, bulkUpdateDiscount
+    deleteCoupon, bulkUpdateDiscount, continuePayment
 
 }
+
+async function continuePayment(req, res, next) {
+    try {
+      const { orderId, paymentMethod } = req.body;
+      if (!orderId || !paymentMethod) {
+        return res.status(400).json({ message: "Thiếu orderId hoặc paymentMethod" });
+      }
+  
+      // Lấy order từ DB (ví dụ với orderModel)
+      const order = await orderModel.findById(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+      }
+  
+      // Kiểm tra trạng thái thanh toán của đơn hàng
+      if (order.payment_status !== "pending") {
+        return res.status(400).json({ message: "Đơn hàng không ở trạng thái chờ thanh toán" });
+      }
+  
+      let redirectUrl = "";
+  
+      if (paymentMethod === "vnpay") {
+        // Ví dụ gọi API VNPay như đã triển khai trước đó...
+        const payloadVNPay = {
+          orderId: order._id.toString(),
+          amount: order.total,
+          orderInfo: req.body.orderInfo || "Thanh toán đơn hàng tại Shop",
+          bankCode: req.body.bankCode || "",
+          language: req.body.language || "vn"
+        };
+  
+        const vnResponse = await axios.post("http://localhost:3000/payment/create-vnpay", payloadVNPay);
+        if (vnResponse.data && vnResponse.data.paymentUrl) {
+          redirectUrl = vnResponse.data.paymentUrl;
+        } else {
+          throw new Error("Không có paymentUrl trả về từ API VNPay");
+        }
+    } else if (paymentMethod === "zalopay") {
+        // Xây dựng payload cho Zalopay giống như trong router '/zalopay/payment'
+        const payloadZalo = {
+          appUser: req.body.appUser || 'user123',
+          amount: order.total, // sử dụng đơn vị và giá trị từ order, đảm bảo đơn vị tương thích với yêu cầu của ZaloPay
+          orderInfo: req.body.orderInfo || "Thanh toán đơn hàng tại Shop",
+          items: req.body.items || []
+        };
+      
+        // Gọi API nội bộ của Zalopay
+        const zalopayResponse = await axios.post("http://localhost:3000/payment/zalopay/payment", payloadZalo);
+        // Kiểm tra dữ liệu trả về từ ZaloPay:
+        // Nếu có payment_url, dùng luôn; nếu không, lấy trường order_url (hoặc cashier_order_url) từ phản hồi.
+        if (zalopayResponse.data) {
+          redirectUrl = zalopayResponse.data.payment_url || zalopayResponse.data.order_url || zalopayResponse.data.cashier_order_url;
+        }
+      
+        if (!redirectUrl) {
+          console.log("ZaloPay response data:", zalopayResponse.data);
+          throw new Error("Không có payment_url/order_url trả về từ API Zalopay");
+        }
+      } else {
+        return res.status(400).json({ message: "Phương thức thanh toán không hợp lệ" });
+      }
+  
+      // Sau đó trả về redirectUrl cho FrontEnd để người dùng chuyển hướng đến cổng thanh toán
+      return res.status(200).json({
+        message: "Tiếp tục thanh toán thành công",
+        order,
+        redirectUrl
+      });
+    } catch (error) {
+      console.error("Lỗi trong continuePayment:", error);
+      return res.status(500).json({ message: error.message });
+    }
+  }
+  
+  
+
 async function bulkUpdateDiscount(req, res) {
     try {
         const { discountPercentage, startDate, endDate, filter } = req.body;
@@ -731,11 +815,9 @@ async function deleteFavorite(req, res) {
 //
 async function confirmPayment(req, res, next) {
     try {
-        // FE gửi trường unified 'responseCode' với các quy ước:
-        // VNPay: "00" khi thành công, Zalopay: "1" khi thành công
         const { orderId, paymentId, responseCode } = req.body;
 
-        // Xác định trạng thái thanh toán: thành công nếu responseCode là "00" (VNPay) hoặc "1" (Zalopay)
+        // Xác định trạng thái thanh toán: 'success' nếu responseCode là "00" (VNPay) hoặc "1" (Zalopay), ngược lại là 'failed'
         const newPaymentStatus = (responseCode === '00' || responseCode === '1') ? 'success' : 'failed';
 
         // Cập nhật Payment theo paymentId
@@ -745,14 +827,25 @@ async function confirmPayment(req, res, next) {
             { new: true }
         );
 
-        // Quy ước: payment_status của Order: 0: pending, 1: success, 2: failed
-        const orderPaymentStatus = newPaymentStatus === 'success' ? 1 : 2;
+        // Nếu thanh toán thành công thì payment_status của Order là 'success', nếu thất bại là 'failed'
+        const orderPaymentStatus = newPaymentStatus === 'success' ? 'success' : 'failed';
 
-        // Cập nhật Order theo orderId và lưu luôn paymentId
+        // Tạo object cập nhật cho Order.
+        const orderUpdateData = {
+            payment_status: orderPaymentStatus,
+            paymentId: updatedPayment._id
+        };
+        if (newPaymentStatus === 'failed') {
+            // Khi payment thất bại, cập nhật status của Order thành -1 (Bị hủy)
+            orderUpdateData.status = -1;
+        }
+
+        console.log("orderUpdateData:", orderUpdateData);
+
         const updatedOrder = await orderModel.findByIdAndUpdate(
             orderId,
-            { payment_status: orderPaymentStatus, paymentId: updatedPayment._id },
-            { new: true }
+            { $set: orderUpdateData },
+            { new: true, runValidators: true }
         );
 
         return res.status(200).json({
@@ -1482,29 +1575,29 @@ async function toggleLike(req, res) {
 //lấy comment
 async function getComments(req, res) {
     try {
-      const { productId, page = 1, limit = 10 } = req.query; // page và limit mặc định
-      const filter = productId ? { productId } : {};
-  
-      // Tính toán số lượng tài liệu bỏ qua
-      const skip = (Number(page) - 1) * Number(limit);
-  
-      // Lấy tổng số comment cho phân trang (nếu cần)
-      const total = await commentModel.countDocuments(filter);
-  
-      // Query dữ liệu với phân trang
-      const comments = await commentModel.find(filter)
-        .populate('userId', 'name url_image')
-        .populate('productId', 'name')
-        .sort({ date: -1 })
-        .skip(skip)
-        .limit(Number(limit));
-  
-      res.status(200).json({ comments, total, page: Number(page), limit: Number(limit) });
+        const { productId, page = 1, limit = 10 } = req.query; // page và limit mặc định
+        const filter = productId ? { productId } : {};
+
+        // Tính toán số lượng tài liệu bỏ qua
+        const skip = (Number(page) - 1) * Number(limit);
+
+        // Lấy tổng số comment cho phân trang (nếu cần)
+        const total = await commentModel.countDocuments(filter);
+
+        // Query dữ liệu với phân trang
+        const comments = await commentModel.find(filter)
+            .populate('userId', 'name url_image')
+            .populate('productId', 'name')
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(Number(limit));
+
+        res.status(200).json({ comments, total, page: Number(page), limit: Number(limit) });
     } catch (error) {
-      console.error("Error fetching comments:", error);
-      res.status(500).json({ message: "Error fetching comments", error });
+        console.error("Error fetching comments:", error);
+        res.status(500).json({ message: "Error fetching comments", error });
     }
-  };
+};
 //unlike comment
 async function unlikeComment(req, res) {
     try {
@@ -1968,7 +2061,11 @@ async function updateById(productId, productData, images) {
             productId,
             productData,
             { new: true, session }
-        );
+        )
+            .populate('publisher')
+            .populate('category')
+            .populate('author')
+            .populate('discount');
 
         // Xử lý cập nhật ảnh:
         // Xóa hết các ảnh cũ liên quan đến sản phẩm này

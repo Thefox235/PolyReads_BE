@@ -26,4 +26,7 @@ router.put('/:id', orderController.updateOrder);
 // Xóa đơn hàng theo ID
 router.delete('/:id', orderController.deleteOrder);
 
+// tiếp tục thanh toán 
+router.post("/continue-payment", orderController.continuePayment);
+
 module.exports = router;
