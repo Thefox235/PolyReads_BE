@@ -1914,8 +1914,8 @@ async function deleteComment(req, res) {
  */
 async function createDiscount(req, res) {
     try {
-        const { value, code, start_date, end_date, is_active } = req.body;
-        const discount = new discountModel({ value, code, start_date, end_date, is_active });
+        const { value, start_date, end_date, is_active } = req.body;
+        const discount = new discountModel({ value, start_date, end_date, is_active });
         await discount.save();
         res.status(201).json({
             message: "Discount created successfully",

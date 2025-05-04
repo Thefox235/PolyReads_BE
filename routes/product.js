@@ -5,6 +5,7 @@ productController = require('../mongo/controller.model.js')
 const checktoken = require('../hepler/checktoken.js');
 const authorizeRole = require("../hepler/authorizeRole.js");  //cách dùng router.put("/:id", checktoken, authorizeRole("1"), async (req, res) => {
 const mongoose = require('mongoose');
+const discountModel = require('../mongo/discount.model.js');
 /* GET users listing. */
 //filter theo nxb
 router.get('/filter-publishers', async (req, res) => {
@@ -95,6 +96,41 @@ router.put('/apply-discount', async (req, res) => {
     res.status(500).json({ message: "Error applying discount", error });
   }
 });
+
+router.put('/discount', async (req, res) => {
+  try {
+    const { categoryId, discountId } = req.body;
+
+    if (!categoryId) {
+      return res.status(400).json({ message: "Thiếu categoryId." });
+    }
+
+    // Nếu discountId được truyền và không null, kiểm tra xem discount có tồn tại không
+    if (discountId) {
+      const discount = await discountModel.findById(discountId);
+      if (!discount) {
+        return res.status(404).json({ message: "Discount không tồn tại." });
+      }
+    }
+
+    // Thực hiện update tất cả các sản phẩm mà trường category phù hợp
+    // Nếu discountId không có (hoặc null) thì cập nhật discount: null
+    const updateResult = await productModel.updateMany(
+      { category: categoryId },
+      { discount: discountId || null }
+    );
+
+    return res.status(200).json({
+      message: "Cập nhật discount cho sản phẩm thành công.",
+      modifiedCount: updateResult.nModified || updateResult.modifiedCount,
+      details: updateResult,
+    });
+  } catch (error) {
+    console.error("Error updating discount for products:", error);
+    return res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+});
+
 //lấy tất cả sản phẩm localhost:3000/product/
 router.get('/', async (req, res) => {
   try {
