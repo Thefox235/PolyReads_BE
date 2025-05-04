@@ -10,13 +10,13 @@ const sendMail = async ({ email, subject, text, html }) => {
       port: 587,
       secure: false, // dùng TLS (port 587)
       auth: {
-        user: process.env.GMAIL_USER || gmailUser,
-        pass: process.env.GMAIL_PASS || gmailPass
+        user: gmailUser,
+        pass: gmailPass
       }
     });
 
     const mailOptions = {
-      from: process.env.GMAIL_USER || gmailUser,
+      from: gmailUser,
       to: email,
       subject: subject,
       ...(html ? { html } : { text })
