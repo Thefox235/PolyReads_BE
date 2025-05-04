@@ -17,7 +17,13 @@ const orderSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'users' },
   paymentId: { type: Schema.Types.ObjectId, ref: 'payment' },
   addressId: { type: Schema.Types.ObjectId, ref: 'address' },
+  // Thêm thông tin coupon khi người dùng áp dụng
+  coupon: {
+    couponId: { type: Schema.Types.ObjectId, ref: 'coupon', required: false },
+    code: { type: String },
+    discountPercentage: { type: Number },
+    discountValue: { type: Number }
+  }
 });
-
 
 module.exports = mongoose.models.order || mongoose.model('order', orderSchema);

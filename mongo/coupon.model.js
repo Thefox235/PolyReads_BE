@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 
-const couponSchema = new mongoose.Schema({
+const couponSchema = new Schema({
   code: { 
     type: String, 
     unique: true, 
@@ -12,15 +13,15 @@ const couponSchema = new mongoose.Schema({
     min: 0, 
     max: 100 
   },
-  // Trường mới để phân biệt loại voucher
+  description: {
+    type: String,
+    required: true
+  },
   couponType: {
     type: String,
-    enum: ['order', 'shipping'],  // 'order' cho giảm theo tổng đơn hàng, 'shipping' cho giảm phí vận chuyển
+    enum: ['order', 'shipping'],
     required: true,
     default: 'order'
-  },
-  description: { 
-    type: String 
   },
   validFrom: { 
     type: Date, 
@@ -38,7 +39,6 @@ const couponSchema = new mongoose.Schema({
     type: Number, 
     default: 0 
   },
-  // Trường này có thể áp dụng riêng cho voucher loại 'order'
   minimumOrderValue: { 
     type: Number, 
     default: 0 
@@ -46,7 +46,19 @@ const couponSchema = new mongoose.Schema({
   isActive: { 
     type: Boolean, 
     default: true 
-  }
+  },
+  // Thêm vào trường xác định phạm vi áp dụng của coupon
+  scope: {
+    type: String,
+    enum: ['global', 'limited', 'new'],
+    required: true,
+    default: 'global'
+  },
+  // Nếu coupon là limited, lưu danh sách các userId được phép sử dụng
+  eligibleUserIds: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, { timestamps: true });
 
-module.exports = mongoose.model('Coupon', couponSchema);
+module.exports = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);

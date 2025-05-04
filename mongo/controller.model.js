@@ -67,9 +67,100 @@ module.exports = {
     calculateShippingFee, getWards, getDistricts, getProvinces, getCities,
     getWardsByDistrict, getDistrictsByCity, getRates, notifyCustomer,
     createFullOrder, createCoupon, getAllCoupons, getCouponById, updateCoupon,
-    deleteCoupon, bulkUpdateDiscount, continuePayment
+    deleteCoupon, bulkUpdateDiscount, continuePayment, validateCoupon, getValidCoupons,
+    getGlobalCoupons
 
 }
+// Trong controller.model.js
+// Trong controller.model.js
+async function getGlobalCoupons(req, res) {
+    try {
+      const now = new Date();
+      // Giả sử model Coupon có trường 'scope'
+      const coupons = await couponModel.find({
+        scope: "global",
+        isActive: true,
+        validFrom: { $lte: now },
+        validUntil: { $gte: now },
+      });
+      res.status(200).json({ coupons });
+    } catch (error) {
+      console.error("Error fetching global coupons:", error);
+      res.status(500).json({ message: "Có lỗi xảy ra khi lấy danh sách coupon chung.", error });
+    }
+  }
+  
+//lấy coupon dã validate
+async function getValidCoupons(req, res) {
+    try {
+      const total = Number(req.query.total) || 0;
+      const now = new Date();
+  
+      // Trả về những coupon active, có hiệu lực và nếu có minimumOrderValue thì đơn hàng >= mức đó
+      const coupons = await couponModel.find({
+        isActive: true,
+        validFrom: { $lte: now },
+        validUntil: { $gte: now },
+        $or: [
+          { minimumOrderValue: { $exists: false } },
+          { minimumOrderValue: { $lte: total } }
+        ]
+      });
+  
+      res.status(200).json({ coupons });
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách coupon hợp lệ:", error);
+      res.status(500).json({ message: "Có lỗi xảy ra khi lấy danh sách coupon hợp lệ." });
+    }
+  }
+  
+//kiểm tra coupon
+async function validateCoupon(req, res) {
+    try {
+      const { couponCode, orderTotal } = req.body;  // orderTotal truyền từ frontend
+  
+      if (!couponCode || !couponCode.trim()) {
+        return res.status(400).json({ message: "Mã coupon không được để trống." });
+      }
+  
+      const coupon = await couponModel.findOne({ 
+        code: couponCode.trim().toUpperCase(), 
+        isActive: true,
+        validFrom: { $lte: new Date() },
+        validUntil: { $gte: new Date() }
+      });
+  
+      if (!coupon) {
+        return res.status(404).json({ message: "Coupon không tồn tại hoặc đã hết hạn." });
+      }
+  
+      if (coupon.usageLimit && coupon.timesUsed >= coupon.usageLimit) {
+        return res.status(400).json({ message: "Coupon đã đạt giới hạn số lượt sử dụng." });
+      }
+  
+      // Kiểm tra điều kiện minimumOrderValue (nếu có)
+      if (coupon.minimumOrderValue && orderTotal < coupon.minimumOrderValue) {
+        return res.status(400).json({ 
+          message: `Đơn hàng phải có giá trị tối thiểu ${coupon.minimumOrderValue} để sử dụng coupon này.` 
+        });
+      }
+  
+      return res.status(200).json({
+        isValid: true,
+        data: {
+          couponId: coupon._id,
+          code: coupon.code,
+          discountPercentage: coupon.discountPercentage,
+          discountValue: coupon.discountValue,
+          scope: coupon.scope,
+          minimumOrderValue: coupon.minimumOrderValue  // truyền thêm nếu cần
+        }
+      });
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra coupon:", error);
+      return res.status(500).json({ message: "Có lỗi xảy ra khi kiểm tra mã coupon." });
+    }
+  }
 
 async function continuePayment(req, res, next) {
     try {
@@ -180,39 +271,59 @@ async function bulkUpdateDiscount(req, res) {
 }
 
 // Tạo mới coupon (mã giảm giá)
+
 async function createCoupon(req, res) {
     try {
-        const {
-            discountPercentage,
-            couponType,       // 'order' hoặc 'shipping'
-            description,
-            validFrom,
-            validUntil,
-            usageLimit,
-            minimumOrderValue,
-            isActive
-        } = req.body;
-
-        const coupon = new couponModel({
-            discountPercentage,
-            couponType,
-            description,
-            validFrom,
-            validUntil,
-            usageLimit,
-            minimumOrderValue,
-            isActive
-        });
-        await coupon.save();
-        res.status(201).json({
-            message: "Coupon created successfully",
-            coupon
-        });
+      const {
+        code,
+        discountPercentage,
+        couponType,       // 'order' hoặc 'shipping'
+        description,
+        validFrom,
+        validUntil,
+        usageLimit,
+        minimumOrderValue,
+        isActive,
+        scope,            // 'global' hoặc 'limited'
+        eligibleUserIds   // Mảng userId nếu coupon dạng limited
+      } = req.body;
+  
+      // Nếu scope là limited, phải có danh sách eligibleUserIds
+      if (scope === 'limited' && (!eligibleUserIds || eligibleUserIds.length === 0)) {
+        return res.status(400).json({ message: "Với coupon limited, vui lòng cung cấp danh sách eligibleUserIds." });
+      }
+  
+      const couponData = {
+        code,
+        description,
+        discountPercentage,
+        couponType,
+        validFrom,
+        validUntil,
+        usageLimit,
+        minimumOrderValue,
+        isActive,
+        scope,  // nếu không truyền vào, thì sẽ lấy default 'global' theo schema
+      };
+  
+      // Nếu coupon là limited, gán eligibleUserIds
+      if (scope === 'limited') {
+        couponData.eligibleUserIds = eligibleUserIds;
+      }
+  
+      const coupon = new couponModel(couponData);
+      await coupon.save();
+  
+      res.status(201).json({
+        message: "Coupon created successfully",
+        coupon
+      });
     } catch (error) {
-        console.error("Error creating coupon:", error);
-        res.status(500).json({ message: "Error creating coupon", error });
+      console.error("Error creating coupon:", error);
+      res.status(500).json({ message: "Error creating coupon", error });
     }
-}
+  }
+  
 
 // Lấy danh sách coupon
 async function getAllCoupons(req, res) {
@@ -243,34 +354,60 @@ async function getCouponById(req, res) {
 // Cập nhật coupon theo id
 async function updateCoupon(req, res) {
     try {
-        const { id } = req.params;
-        const {
-            discountPercentage,
-            couponType,
-            description,
-            validFrom,
-            validUntil,
-            usageLimit,
-            minimumOrderValue,
-            isActive
-        } = req.body;
-        const coupon = await couponModel.findByIdAndUpdate(
-            id,
-            { discountPercentage, couponType, description, validFrom, validUntil, usageLimit, minimumOrderValue, isActive },
-            { new: true }
-        );
-        if (!coupon) {
-            return res.status(404).json({ message: "Coupon not found" });
-        }
-        res.status(200).json({
-            message: "Coupon updated successfully",
-            coupon
-        });
+      const { id } = req.params;
+      const {
+        code,
+        discountPercentage,
+        description,
+        couponType,
+        validFrom,
+        validUntil,
+        usageLimit,
+        minimumOrderValue,
+        isActive,
+        scope,
+        eligibleUserIds
+      } = req.body;
+  
+      // Nếu scope là 'limited' thì kiểm tra eligibleUserIds
+      if (scope === 'limited' && (!eligibleUserIds || eligibleUserIds.length === 0)) {
+        return res.status(400).json({ message: "Với coupon limited, vui lòng cung cấp danh sách eligibleUserIds." });
+      }
+  
+      const updateData = {
+        code,
+        discountPercentage,
+        description,
+        couponType,
+        validFrom,
+        validUntil,
+        usageLimit,
+        minimumOrderValue,
+        isActive,
+        scope
+      };
+  
+      if (scope === 'limited') {
+        updateData.eligibleUserIds = eligibleUserIds;
+      } else {
+        // Nếu coupon chuyển từ limited sang global, có thể xóa trường eligibleUserIds 
+        updateData.eligibleUserIds = [];
+      }
+  
+      const coupon = await couponModel.findByIdAndUpdate(id, updateData, { new: true });
+      if (!coupon) {
+        return res.status(404).json({ message: "Coupon not found" });
+      }
+      res.status(200).json({
+        message: "Coupon updated successfully",
+        coupon
+      });
     } catch (error) {
-        console.error("Error updating coupon:", error);
-        res.status(500).json({ message: "Error updating coupon", error });
+      console.error("Error updating coupon:", error);
+      res.status(500).json({ message: "Error updating coupon", error });
     }
-}
+  }
+  
 
 // Xóa coupon theo id
 async function deleteCoupon(req, res) {
@@ -1169,40 +1306,56 @@ async function getOrderById(req, res) {
 // Tạo đơn hàng mới
 async function createOrder(req, res) {
     try {
-        const {
-            name,
-            quantity,
-            img,
-            price,
-            status,
-            payment_status,
-            total,
-            userId,
-            paymentId,
-            addressId
-        } = req.body;
-
-        const newOrder = new orderModel({
-            name,
-            quantity,
-            img,
-            price,
-            status,
-            payment_status,
-            total,
-            userId,
-            paymentId,
-            addressId,
-            date: new Date()
-        });
-
-        const savedOrder = await newOrder.save();
-        res.status(201).json({ message: "Order được tạo thành công", order: savedOrder });
+      const {
+        name,
+        quantity,
+        img,
+        price,
+        status,
+        payment_status,
+        total,
+        userId,
+        paymentId,
+        addressId,
+        coupon  // Thông tin coupon truyền qua req.body nếu người dùng đã áp dụng coupon
+      } = req.body;
+  
+      // Chuẩn bị object dữ liệu order
+      const orderData = {
+        name,
+        quantity,
+        img,
+        price,
+        status,
+        payment_status,
+        total,
+        userId,
+        paymentId,
+        addressId,
+        date: new Date()
+      };
+  
+      // Kiểm tra nếu có thông tin coupon được gửi lên thì gắn vào orderData
+      if (coupon && coupon.couponId) {
+        orderData.coupon = {
+          couponId: coupon.couponId,
+          code: coupon.code,
+          discountPercentage: coupon.discountPercentage,
+          discountValue: coupon.discountValue
+        };
+      }
+  
+      const newOrder = new orderModel(orderData);
+      const savedOrder = await newOrder.save();
+  
+      // Nếu bạn muốn theo dõi lịch sử sử dụng coupon, có thể tạo record trong collection CouponUsage tại đây
+  
+      res.status(201).json({ message: "Order được tạo thành công", order: savedOrder });
     } catch (error) {
-        console.error("Lỗi tạo order:", error);
-        res.status(500).json({ message: error.message });
+      console.error("Lỗi tạo order:", error);
+      res.status(500).json({ message: error.message });
     }
-};
+  }
 
 // Cập nhật Order theo ID
 async function updateOrder(req, res) {
@@ -2514,7 +2667,7 @@ async function register(req, res) {
             const token = jwt.sign(
                 { _id: savedUser._id, email: savedUser.email, role: savedUser.role },
                 JWT_SECRET,
-                { expiresIn: 3600 }
+                { expiresIn: 21600 }
             );
             return res.status(200).json({ ...savedUser._doc, token });
         } else {
