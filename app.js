@@ -6,6 +6,8 @@ var logger = require('morgan');
 const mongoose = require ('mongoose');
 const cors = require ('cors');
 require('dotenv').config(); 
+// Import file scheduler để kích hoạt các tác vụ định kỳ
+require('./hepler/scheduler');
 
 require('./mongo/category.model');
 require('./mongo/product.model');
