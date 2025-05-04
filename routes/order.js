@@ -29,4 +29,21 @@ router.delete('/:id', orderController.deleteOrder);
 // tiếp tục thanh toán 
 router.post("/continue-payment", orderController.continuePayment);
 
+// Endpoint để gửi email xác nhận đơn hàng thành công
+router.post('/:orderId/email', async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      // Yêu cầu body chứa email và orderDetails (bao gồm total và items)
+      const { email, orderDetails } = req.body;
+  
+      // Gọi hàm processPaymentSuccess để gửi email
+      const result = await orderController.processPaymentSuccess(orderId, email, orderDetails);
+      res.status(200).json({ message: "Email sent successfully", result });
+    } catch (error) {
+      console.error("Error in payment email endpoint:", error);
+      res.status(500).json({ message: "Error sending email", error });
+    }
+  });
+  
+
 module.exports = router;

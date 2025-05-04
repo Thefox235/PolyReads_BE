@@ -1,7 +1,8 @@
 // sendmail.js
 require('dotenv').config();
 const nodemailer = require('nodemailer');
-
+const gmailUser = "polyreadstore@gmail.com";
+const gmailPass = "ocilijeadsdfqfqt"
 const sendMail = async ({ email, subject, text, html }) => {
   try {
     const transporter = nodemailer.createTransport({
@@ -9,13 +10,13 @@ const sendMail = async ({ email, subject, text, html }) => {
       port: 587,
       secure: false, // dùng TLS (port 587)
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS
+        user: process.env.GMAIL_USER || gmailUser,
+        pass: process.env.GMAIL_PASS || gmailPass
       }
     });
 
     const mailOptions = {
-      from: process.env.GMAIL_USER,
+      from: process.env.GMAIL_USER || gmailUser,
       to: email,
       subject: subject,
       ...(html ? { html } : { text })
@@ -25,8 +26,10 @@ const sendMail = async ({ email, subject, text, html }) => {
     console.log('Email sent successfully:', result.messageId);
     return result;
   } catch (error) {
-    console.error('Error sending email:', error);
-    throw error;
+    console.log("Sending email to:", email);
+    if (!email) {
+      throw new Error("No recipient email provided");
+    }
   }
 };
 
