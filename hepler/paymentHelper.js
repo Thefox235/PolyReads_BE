@@ -10,7 +10,7 @@ const VNP_TMN_CODE = "5IVE3QI3";
 const VNP_HASH_SECRET = "0MXMLPKKEZ9PV9ERLZEBZ25FGPF4OEEE";
 const VNP_PAY_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
 const VNP_API = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
-const VNP_RETURN_URL = "http://localhost:3001/paymentResult";
+const VNP_RETURN_URL = "https://poly-reads.vercel.app/paymentResult";
 
 // Khai báo trực tiếp cấu hình của ZaloPay
 const zalopayConfig = {

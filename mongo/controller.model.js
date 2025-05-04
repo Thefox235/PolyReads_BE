@@ -224,7 +224,7 @@ async function continuePayment(req, res, next) {
                 language: req.body.language || "vn"
             };
 
-            const vnResponse = await axios.post("http://localhost:3000/payment/create-vnpay", payloadVNPay);
+            const vnResponse = await axios.post("https://polyread-be.netlify.app/payment/create-vnpay", payloadVNPay);
             if (vnResponse.data && vnResponse.data.paymentUrl) {
                 redirectUrl = vnResponse.data.paymentUrl;
             } else {
@@ -240,7 +240,7 @@ async function continuePayment(req, res, next) {
             };
 
             // Gọi API nội bộ của Zalopay
-            const zalopayResponse = await axios.post("http://localhost:3000/payment/zalopay/payment", payloadZalo);
+            const zalopayResponse = await axios.post("https://polyread-be.netlify.app/payment/zalopay/payment", payloadZalo);
             // Kiểm tra dữ liệu trả về từ ZaloPay:
             // Nếu có payment_url, dùng luôn; nếu không, lấy trường order_url (hoặc cashier_order_url) từ phản hồi.
             if (zalopayResponse.data) {
